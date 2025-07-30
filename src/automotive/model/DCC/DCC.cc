@@ -39,6 +39,19 @@ DCC::~DCC()
 std::unordered_map<DCC::ReactiveState, DCC::ReactiveParameters> DCC::getConfiguration(double Ton, double currentCBR)
 {
     std::unordered_map<DCC::ReactiveState, DCC::ReactiveParameters> map;
+    if (Ton < 0.5)
+      {
+        map = m_reactive_parameters_Ton_500_us;
+      }
+    else if (Ton < 1)
+      {
+        map = m_reactive_parameters_Ton_1ms;
+      }
+    else
+      {
+        // Default
+        map = m_reactive_parameters_Ton_1ms;
+      }
     ReactiveState old_state = m_current_state;
     if (currentCBR >= map[m_current_state].cbr_threshold && m_current_state != ReactiveState::Restrictive)
     {
@@ -55,33 +68,28 @@ std::unordered_map<DCC::ReactiveState, DCC::ReactiveParameters> DCC::getConfigur
         }
       }
     }
-    if (old_state != m_current_state)
+    if (old_state == m_current_state)
     {
-      if (Ton < 0.5)
-      {
-        map = m_reactive_parameters_Ton_500_us;
-      }
-      else if (Ton < 1)
-      {
-        map = m_reactive_parameters_Ton_1ms;
-      }
-      else
-      {
-        // Default
-        map = m_reactive_parameters_Ton_1ms;
-      }
+      map.clear();
     }
+    else
+      {
+        // if (m_current_state > 1) std::cout << "State changed from: " << old_state << "; to: " << m_current_state << std::endl;
+      }
     return map;
 }
 
-void DCC::SetupDCC(std::string item_id, Ptr<Node> node, std::string modality, uint32_t dcc_interval, Ptr<MetricSupervisor> traci_client)
+void DCC::SetupDCC(std::string item_id, Ptr<Node> node, std::string modality, uint32_t dcc_interval, Ptr<MetricSupervisor> met_sup)
 {
+  NS_ASSERT_MSG (modality == "adaptive" || modality == "reactive", "DCC modality can be only adaptive or reactive");
+  NS_ASSERT_MSG (dcc_interval > 0, "DCC interval must be greater than 0");
+  NS_ASSERT_MSG (met_sup != nullptr, "MetricSupervisor is null");
+  NS_ASSERT_MSG (node != nullptr, "Node is null");
   m_item_id = item_id;
   m_node = node;
-  NS_ASSERT_MSG (modality == "adaptive" || modality == "reactive", "DCC modality can be only "adaptive" or "reactive"");
   m_modality = modality;
   m_dcc_interval = modality == "reactive" ? dcc_interval : dcc_interval / 2;
-  m_traci_client = traci_client;
+  m_metric_supervisor = met_sup;
 }
 
 void DCC::StartDCC()
@@ -108,6 +116,11 @@ void DCC::reactiveDCC()
   NS_ASSERT_MSG (m_dcc_interval != -1, "DCC interval not set");
 
   double currentCBR = m_metric_supervisor->getCBRPerItem(m_item_id);
+  if (currentCBR == -1)
+    {
+      Simulator::Schedule(MilliSeconds(m_dcc_interval), &DCC::reactiveDCC, this);
+      return;
+    }
   // Get the NetDevice
   Ptr<NetDevice> netDevice = m_node->GetDevice (0);
   Ptr<WifiNetDevice> wifiDevice;
@@ -192,73 +205,76 @@ void DCC::reactiveDCC()
 void DCC::adaptiveDCC()
 {
   NS_LOG_INFO ("Starting DCC check");
-  NS_ASSERT_MSG (m_traci_client != nullptr, "TraCI client not set");
   NS_ASSERT_MSG (m_metric_supervisor != nullptr, "Metric Supervisor not set");
   NS_ASSERT_MSG (m_dcc_interval != -1.0, "DCC interval not set");
 
   if (!m_time_to_do_steps)
   {
     m_previous_cbr = m_metric_supervisor->getCBRPerItem(m_item_id);
+    if (m_previous_cbr == -1) m_previous_cbr = 0;
     m_time_to_do_steps = true;
   }
   else
   {
     double currentCBR = m_metric_supervisor->getCBRPerItem(m_item_id);
-    double delta_offset;
-    // Step 1
-    if (m_CBR_its != -1)
+    if (currentCBR != -1)
       {
-        m_CBR_its = 0.5 * m_CBR_its + 0.25 * ((currentCBR + m_previous_cbr) / 2);
-      }
-    else
-      {
-        m_CBR_its = (currentCBR + m_previous_cbr) / 2;
-      }
-    // Step 2
-    double factor1 = m_beta * (m_CBR_target - m_CBR_its);
-    if ((m_CBR_target - m_CBR_its) > 0)
-      {
-        delta_offset = factor1 < m_Gmax ? factor1 : m_Gmax;
-      }
-    else
-      {
-        delta_offset = factor1 > m_Gmin ? factor1 : m_Gmin;
-      }
+        double delta_offset;
+        // Step 1
+        if (m_CBR_its != -1)
+          {
+            m_CBR_its = 0.5 * m_CBR_its + 0.25 * ((currentCBR + m_previous_cbr) / 2);
+          }
+        else
+          {
+            m_CBR_its = (currentCBR + m_previous_cbr) / 2;
+          }
+        // Step 2
+        double factor1 = m_beta * (m_CBR_target - m_CBR_its);
+        if ((m_CBR_target - m_CBR_its) > 0)
+          {
+            delta_offset = factor1 < m_Gmax ? factor1 : m_Gmax;
+          }
+        else
+          {
+            delta_offset = factor1 > m_Gmin ? factor1 : m_Gmin;
+          }
 
-    // Step 3
-    m_delta = (1 - m_alpha) * m_delta + delta_offset;
+        // Step 3
+        m_delta = (1 - m_alpha) * m_delta + delta_offset;
 
-    // Step 4
-    if (m_delta > m_delta_max)
-      {
-        m_delta = m_delta_max;
-      }
+        // Step 4
+        if (m_delta > m_delta_max)
+          {
+            m_delta = m_delta_max;
+          }
 
-    // Step 5
-    if (m_delta < m_delta_min)
-      {
-        m_delta = m_delta_min;
-      }
+        // Step 5
+        if (m_delta < m_delta_min)
+          {
+            m_delta = m_delta_min;
+          }
 
-    if (m_caService != nullptr)
-      {
-        m_caService->toffUpdateAfterDeltaUpdate (m_delta);
-      }
-    if (m_caServiceV1 != nullptr)
-      {
-        m_caServiceV1->toffUpdateAfterDeltaUpdate (m_delta);
-      }
-    if (m_cpService != nullptr)
-      {
-        m_cpService->toffUpdateAfterDeltaUpdate(m_delta);
-      }
-    if (m_cpServiceV1 != nullptr)
-      {
-        m_cpServiceV1->toffUpdateAfterDeltaUpdate(m_delta);
-      }
-    if (m_vruService != nullptr)
-      {
-        m_vruService->toffUpdateAfterDeltaUpdate(m_delta);
+        if (m_caService != nullptr)
+          {
+            m_caService->toffUpdateAfterDeltaUpdate (m_delta);
+          }
+        if (m_caServiceV1 != nullptr)
+          {
+            m_caServiceV1->toffUpdateAfterDeltaUpdate (m_delta);
+          }
+        if (m_cpService != nullptr)
+          {
+            m_cpService->toffUpdateAfterDeltaUpdate(m_delta);
+          }
+        if (m_cpServiceV1 != nullptr)
+          {
+            m_cpServiceV1->toffUpdateAfterDeltaUpdate(m_delta);
+          }
+        if (m_vruService != nullptr)
+          {
+            m_vruService->toffUpdateAfterDeltaUpdate(m_delta);
+          }
       }
     m_time_to_do_steps = false;
   }

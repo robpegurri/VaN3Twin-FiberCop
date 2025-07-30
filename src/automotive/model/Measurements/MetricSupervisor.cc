@@ -174,6 +174,7 @@ MetricSupervisor::signalSentPacket(std::string buf, double lat, double lon, uint
     }
   else
     {
+      if (!m_v_gpstc.empty()) return;
       NS_FATAL_ERROR("Fatal error: mobility client not set in PRR Supervisor.");
     }
 
@@ -206,6 +207,7 @@ MetricSupervisor::signalReceivedPacket(std::string buf, uint64_t nodeID)
 
   if(m_traci_ptr == nullptr && m_carla_ptr == nullptr)
     {
+      if (!m_v_gpstc.empty()) return;
       NS_FATAL_ERROR("Fatal error: mobility client not set in PRR Supervisor.");
     }
 
@@ -436,6 +438,10 @@ MetricSupervisor::computePRR(std::string buf)
   m_latency_map.erase(buf);
 }
 
+bool IsChannelBusy(WifiPhyState state) {
+  return state == WifiPhyState::TX || state == WifiPhyState::RX || state == WifiPhyState::CCA_BUSY;
+}
+
 void
 storeCBR80211p (std::string context, Time start, Time duration, WifiPhyState state)
 {
@@ -445,7 +451,7 @@ storeCBR80211p (std::string context, Time start, Time duration, WifiPhyState sta
   std::size_t last = context.find ("/", first);
   std::string node = context.substr (first, last - first);
 
-  if (state != WifiPhyState::IDLE && state != WifiPhyState::SLEEP && state != WifiPhyState::TX)
+  if (IsChannelBusy (state))
     {
       // Check if the last measurement for busy state started before the last CBR check
       // In this case we need to consider only the time from the last CBR check
@@ -622,9 +628,45 @@ MetricSupervisor::checkCBR ()
             }
         }
     }
+  else if (!m_v_gpstc.empty())
+    {
+      for (auto gpstc_ptr = m_v_gpstc.begin(); gpstc_ptr != m_v_gpstc.end(); ++gpstc_ptr)
+        {
+          if (currentBusyCBR.find ((*gpstc_ptr)->getNodeID()) != currentBusyCBR.end ())
+            {
+              Time busyCbr = currentBusyCBR[(*gpstc_ptr)->getNodeID()];
+
+              if (m_channel_technology == "Nr")
+                {
+                  // NR duration refers to the future time the channel will be busy due to resource allocation for a certain node
+                  // We need to subtract the time that the channel will be busy for this node after this current check
+                  // This time will be added for the next check (see below)
+                  if (nodeDurationStateNr[(*gpstc_ptr)->getNodeID()] > Simulator::Now ())
+                    {
+                      Time nextToAdd = nodeDurationStateNr[(*gpstc_ptr)->getNodeID()] - Simulator::Now ();
+                      busyCbr -= nextToAdd;
+                      nextTimeToAddNr[(*gpstc_ptr)->getNodeID()] = nextToAdd;
+                    }
+                }
+
+              double currentCbr = busyCbr.GetDouble () / (m_cbr_window * 1e6);
+
+              if (m_average_cbr.find ((*gpstc_ptr)->getID()) != m_average_cbr.end ())
+                {
+                  // Exponential moving average
+                  double new_cbr =
+                      m_cbr_alpha * m_average_cbr[(*gpstc_ptr)->getID()].back () + (1 - m_cbr_alpha) * currentCbr;
+                  m_average_cbr[(*gpstc_ptr)->getID()].push_back (new_cbr);
+                }
+              else
+                {
+                  m_average_cbr[(*gpstc_ptr)->getID()].push_back (currentCbr);
+                }
+            }
+        }
+    }
   currentBusyCBR.clear();
-  if(m_channel_technology == "80211p")
-    nodeLastState80211p.clear();
+  if(m_channel_technology == "80211p") nodeLastState80211p.clear();
   if(m_channel_technology == "Nr")
     {
       nodeDurationStateNr.clear();

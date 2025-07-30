@@ -54,20 +54,20 @@ public:
 
   const std::unordered_map<ReactiveState, ReactiveParameters> m_reactive_parameters_Ton_1ms = 
   {
-    {Relaxed,     {0.3, 24.0, -1, 100, -95.0}},
-    {Active1,     {0.4, 18.0, -1, 200,  -95.0}},
-    {Active2,     {0.5, 12.0, -1, 400, -95.0}},
-    {Active3,     {0.6, 6.0, -1, 500, -95.0}},
-    {Restrictive, {1.0, 2.0, -1, 1000, -65.0}}
+    {Relaxed,     {0.3, 30.0, -1, 100, -95.0}},
+    {Active1,     {0.4, 24.0, -1, 200,  -95.0}},
+    {Active2,     {0.5, 18.0, -1, 400, -95.0}},
+    {Active3,     {0.6, 12.0, -1, 500, -95.0}},
+    {Restrictive, {1.0, 6.0, -1, 1000, -65.0}}
   };
 
   const std::unordered_map<ReactiveState, ReactiveParameters> m_reactive_parameters_Ton_500_us = 
   {
-    {Relaxed,     {0.3, 24.0, -1, 50, -95.0}},
-    {Active1,     {0.4, 18.0, -1, 100,  -95.0}},
-    {Active2,     {0.5, 12.0, -1, 200, -95.0}},
-    {Active3,     {0.65, 6.0, -1, 250, -95.0}},
-    {Restrictive, {1.0, 2.0, -1, 1000, -65.0}}
+    {Relaxed,     {0.3, 30.0, -1, 50, -95.0}},
+    {Active1,     {0.4, 24.0, -1, 100,  -95.0}},
+    {Active2,     {0.5, 18.0, -1, 200, -95.0}},
+    {Active3,     {0.65, 12.0, -1, 250, -95.0}},
+    {Restrictive, {1.0, 6.0, -1, 1000, -65.0}}
   };
 
   /**
@@ -131,7 +131,7 @@ private:
    */
   void adaptiveDCC();
 
-  std::unordered_map<ReactiveState, ReactiveParameters> DCC::getConfiguration(double Ton, double currentCBR);
+  std::unordered_map<ReactiveState, ReactiveParameters> getConfiguration(double Ton, double currentCBR);
 
   std::string m_item_id;
   Ptr<Node> m_node;
@@ -139,7 +139,6 @@ private:
   std::string m_modality = ""; //!< Boolean to indicate if the DCC is reactive or adaptive
   uint32_t m_dcc_interval = -1; //!< Time interval for DCC
   Ptr<MetricSupervisor> m_metric_supervisor = NULL; //!< Pointer to the MetricSupervisor object
-  Ptr<TraciClient> m_traci_client = NULL; //!< Pointer to the TraciClient object
   Ptr<CABasicService> m_caService; //!< Pointer to the CABasicService object
   Ptr<CABasicServiceV1> m_caServiceV1; //!< Pointer to the CABasicService object
   Ptr<CPBasicService> m_cpService; //!< Pointer to the CPBasicService object

@@ -84,6 +84,8 @@ namespace ns3 {
           double getAccelmsq();
           double getTravelledDistance();
           std::string getID();
+          std::string getNodeID();
+          void setNodeID(std::string node_id) {m_node_id = node_id;};
           uint64_t getLastIndex();
           double getLat0();
           double getLon0();
@@ -144,6 +146,8 @@ namespace ns3 {
           Ptr<vehicleVisualizer> m_vehicle_visualizer;
 
           bool m_input_microseconds = false;
+
+          std::string m_node_id;
   };
 
 

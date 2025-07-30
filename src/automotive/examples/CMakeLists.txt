@@ -99,6 +99,18 @@ build_lib_example(
     ${libgps-tc}
     ${libtraci}
 )
+
+build_lib_example(
+        NAME v2v-80211p-gps-tc-dcc
+        SOURCE_FILES v2v-80211p-gps-tc-dcc.cc
+        LIBRARIES_TO_LINK
+        ${libcarla}
+        ${libautomotive}
+        ${libwave}
+        ${libgps-tc}
+        ${libtraci}
+)
+
 build_lib_example(
         NAME v2p-vam-80211p
         SOURCE_FILES v2p-vam-80211p.cc

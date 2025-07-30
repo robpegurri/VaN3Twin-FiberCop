@@ -46,7 +46,7 @@ namespace ns3
             MakeBooleanAccessor (&simpleVAMSender::m_real_time),
             MakeBooleanChecker ())
         .AddAttribute ("GPSClient",
-            "TraCI client for SUMO",
+            "GPSTC client",
             PointerValue (0),
             MakePointerAccessor (&simpleVAMSender::m_gps_tc_client),
             MakePointerChecker<GPSTraceClient> ());

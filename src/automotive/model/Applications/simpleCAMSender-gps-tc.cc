@@ -49,10 +49,30 @@ namespace ns3
             MakeBooleanAccessor (&simpleCAMSender::m_real_time),
             MakeBooleanChecker ())
         .AddAttribute ("GPSClient",
-            "TraCI client for SUMO",
+            "GPSTC client",
             PointerValue (0),
             MakePointerAccessor (&simpleCAMSender::m_gps_tc_client),
-            MakePointerChecker<GPSTraceClient> ());
+            MakePointerChecker<GPSTraceClient> ())
+        .AddAttribute ("DCC",
+                   "",
+                   BooleanValue(false),
+                   MakeBooleanAccessor (&simpleCAMSender::m_enable_dcc),
+                   MakeBooleanChecker ())
+        .AddAttribute("DCCWindow",
+                   "",
+                   IntegerValue(0),
+                   MakeIntegerAccessor (&simpleCAMSender::m_dcc_time_window),
+                   MakeIntegerChecker<int>())
+        .AddAttribute("DCCModality",
+                   "",
+                   StringValue("reactive"),
+                   MakeStringAccessor (&simpleCAMSender::m_dcc_modality),
+                   MakeStringChecker())
+        .AddAttribute ("MetricSupervisor",
+                       "Metric Supervisor",
+                       PointerValue (0),
+                       MakePointerAccessor (&simpleCAMSender::m_met_sup),
+                       MakePointerChecker<MetricSupervisor> ());
         return tid;
   }
 
@@ -145,6 +165,13 @@ namespace ns3
     std::srand(Simulator::Now().GetNanoSeconds ());
     double desync = ((double)std::rand()/RAND_MAX);
     m_caService.startCamDissemination(desync);
+    if (m_enable_dcc)
+      {
+        m_dcc = CreateObject<DCC>();
+        m_dcc->SetupDCC (m_id, m_node, m_dcc_modality, m_dcc_time_window, m_met_sup);
+        m_dcc->AddCABasicService (&m_caService);
+        m_dcc->StartDCC();
+      }
   }
 
   void
@@ -158,9 +185,9 @@ namespace ns3
 
     cam_sent = m_caService.terminateDissemination ();
 
-    std::cout << "Vehicle " << m_id
+    /*std::cout << "Vehicle " << m_id
               << " has sent " << cam_sent
-              << " CAMs" << std::endl;
+              << " CAMs" << std::endl;*/
   }
 
   void
@@ -174,10 +201,12 @@ namespace ns3
   simpleCAMSender::receiveCAM (asn1cpp::Seq<CAM> cam, Address from)
   {
     /* Implement CAM strategy here */
+    /*
     std::cout <<"VehicleID: " << m_id
             <<" | Rx CAM from "<<cam->header.stationId
             <<" | Remote vehicle position: ("<<asn1cpp::getField(cam->cam.camParameters.basicContainer.referencePosition.latitude,double)/DOT_ONE_MICRO<<","
             <<asn1cpp::getField(cam->cam.camParameters.basicContainer.referencePosition.longitude,double)/DOT_ONE_MICRO<<")"<<std::endl;
+    */
 
   }
 

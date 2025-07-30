@@ -62,6 +62,12 @@ namespace ns3
     return m_vehID;
   }
 
+  std::string
+  GPSTraceClient::getNodeID()
+  {
+    return m_node_id;
+  }
+
   void
   GPSTraceClient::setTimestamp(std::string utc_time)
   {

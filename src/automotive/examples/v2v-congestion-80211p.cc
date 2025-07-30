@@ -276,7 +276,7 @@ int main (int argc, char *argv[])
   std::unordered_map<Ptr<Node>, Ptr<DCC>> dcc_per_node;
   for (uint8_t i = 0; i < numberOfNodes; i++)
   {
-    dcc_per_node[c.Get(i)] = &DCC();
+    dcc_per_node[c.Get(i)] = CreateObject<DCC>();
   }
 
   std::cout << "A transmission power of " << txPower << " dBm  will be used." << std::endl;

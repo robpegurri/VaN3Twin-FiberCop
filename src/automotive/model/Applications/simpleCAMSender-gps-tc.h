@@ -10,6 +10,8 @@
 
 #include "ns3/denBasicService.h"
 #include "ns3/caBasicService.h"
+#include "ns3/DCC.h"
+#include "ns3/MetricSupervisor.h"
 
 
 namespace ns3 {
@@ -58,6 +60,12 @@ private:
 
   /* Counters */
   int m_cam_sent;
+
+  bool m_enable_dcc;
+  std::string m_dcc_modality = "";
+  int m_dcc_time_window = 0;
+  Ptr<MetricSupervisor> m_met_sup = nullptr;
+  Ptr<DCC> m_dcc;
 };
 
 } // namespace ns3

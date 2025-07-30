@@ -558,18 +558,22 @@ namespace ns3 {
     double aux = m_Ton_pp / delta * (m_N_GenCpm - waiting) / m_N_GenCpm + waiting;
     aux = std::max (aux, 25.0);
     double new_gen_time = std::min (aux, 1000.0);
-    setCheckCpmGenMs ((long) new_gen_time);
+    setNextCPMDCC ((long) new_gen_time);
     m_last_delta = delta;
   }
 
   void
   CPBasicService::toffUpdateAfterTransmission()
   {
-    if (m_last_delta == 0)
-      return;
-    double aux = m_Ton_pp / m_last_delta;
-    double new_gen_time = std::max(aux, 25.0);
-    new_gen_time = std::min(new_gen_time, 1000.0);
-    setCheckCpmGenMs ((long) new_gen_time);
+    if (m_use_adaptive_dcc)
+    {
+      if (m_last_delta == 0)
+        return;
+      double aux = m_Ton_pp / m_last_delta;
+      double new_gen_time = std::max(aux, 25.0);
+      new_gen_time = std::min(new_gen_time, 1000.0);
+      setNextCPMDCC ((long) new_gen_time);
+    }
+    
   }
 }

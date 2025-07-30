@@ -706,15 +706,6 @@ main (int argc, char *argv[])
   EmergencyVehicleAlertHelper.SetAttribute ("MetricSupervisor", PointerValue (metSup));
   EmergencyVehicleAlertHelper.SetAttribute ("SendCPM", BooleanValue(false));
 
-  Ptr<DCC> dcc = NULL;
-  DCC dccObj = DCC();
-  dcc = &dccObj;
-  dcc->SetDCCInterval(MilliSeconds (200));
-  dcc->SetTraciClient (sumoClient);
-  dcc->SetMetricSupervisor (metSup);
-  dcc->reactiveDCC();
-  dcc->SetNrHelper(nrHelper);
-
   /* callback function for node creation */
   int i=0;
   STARTUP_FCN setupNewWifiNode = [&] (std::string vehicleID,TraciClient::StationTypeTraCI_t stationType) -> Ptr<Node>

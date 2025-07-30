@@ -273,14 +273,11 @@ int main (int argc, char *argv[])
       source_interfering[i] = socket;
     }
 
-  Ptr<DCC> dcc = NULL;
-  DCC dccObj = DCC();
-  dcc = &dccObj;
-  dcc->SetDCCInterval(MilliSeconds (200));
-  dcc->SetTraciClient (sumoClient);
-  dcc->SetMetricSupervisor (metSup);
-  dcc->adaptiveDCC();
-  // dcc->reactiveDCC();
+  std::unordered_map<Ptr<Node>, Ptr<DCC>> dcc_per_node;
+  for (uint8_t i = 0; i < numberOfNodes; i++)
+  {
+    dcc_per_node[c.Get(i)] = &DCC();
+  }
 
   std::cout << "A transmission power of " << txPower << " dBm  will be used." << std::endl;
 
@@ -326,10 +323,10 @@ int main (int argc, char *argv[])
       // retrieve the right BSContainer given a vehicle ID
       basicServices.add(bs_container);
 
-      // Set DCC
-      dcc->AddCABasicService(std::to_string(nodeID), bs_container->getCABasicService());
-      dcc->AddCPBasicService(std::to_string (nodeID), bs_container->getCPBasicService());
-      // dcc->AddVRUBasicService(std::to_string(nodeID), bs_container->getVRUBasicService());
+      // Setup DCC
+      dcc_per_node[c.Get(nodeID)]->SetupDCC(vehicleID, c.Get(nodeID), "reactive", 200, metSup);
+      dcc_per_node[c.Get(nodeID)]->AddCABasicService(bs_container->getCABasicService());
+      dcc_per_node[c.Get(nodeID)]->StartDCC();
 
       // Start transmitting CAMs
       // We randomize the instant in time in which the CAM dissemination is going to start

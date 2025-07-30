@@ -376,15 +376,19 @@ namespace ns3
     head_diff += (head_diff>180.0) ? -360.0 : (head_diff<-180.0) ? 360.0 : 0.0;
     if (head_diff > 4.0 || head_diff < -4.0)
       {
-        cam_error=generateAndEncodeCam ();
-        if(cam_error==CAMV1_NO_ERROR)
-          {
-            m_N_GenCam=0;
-            condition_verified=true;
-            dyn_cond_verified=true;
-          } else {
-            NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
-          }
+        if(m_T_next_dcc == -1 || now - lastCamGen >= m_T_next_dcc)
+        {
+          cam_error=generateAndEncodeCam ();
+          if(cam_error==CAMV1_NO_ERROR)
+            {
+              m_N_GenCam=0;
+              condition_verified=true;
+              dyn_cond_verified=true;
+            } else {
+              NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
+            }
+        } 
+        
       }
 
     /* 1b)
@@ -395,15 +399,18 @@ namespace ns3
     double pos_diff = m_vdp->getTravelledDistance () - m_prev_distance;
     if (!condition_verified && (pos_diff > 4.0 || pos_diff < -4.0))
       {
-        cam_error=generateAndEncodeCam ();
-        if(cam_error==CAMV1_NO_ERROR)
-          {
-            m_N_GenCam=0;
-            condition_verified=true;
-            dyn_cond_verified=true;
-          } else {
-            NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
-          }
+        if(m_T_next_dcc == -1 || now - lastCamGen >= m_T_next_dcc)
+        {
+          cam_error=generateAndEncodeCam ();
+          if(cam_error==CAMV1_NO_ERROR)
+            {
+              m_N_GenCam=0;
+              condition_verified=true;
+              dyn_cond_verified=true;
+            } else {
+              NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
+            }
+        }
       }
 
     /* 1c)
@@ -414,15 +421,18 @@ namespace ns3
     double speed_diff = m_vdp->getSpeedValue () - m_prev_speed;
     if (!condition_verified && (speed_diff > 0.5 || speed_diff < -0.5))
       {
-        cam_error=generateAndEncodeCam ();
-        if(cam_error==CAMV1_NO_ERROR)
-          {
-            m_N_GenCam=0;
-            condition_verified=true;
-            dyn_cond_verified=true;
-          } else {
-            NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
-          }
+        if(m_T_next_dcc == -1 || now - lastCamGen >= m_T_next_dcc)
+        {
+          cam_error=generateAndEncodeCam ();
+          if(cam_error==CAMV1_NO_ERROR)
+            {
+              m_N_GenCam=0;
+              condition_verified=true;
+              dyn_cond_verified=true;
+            } else {
+              NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
+            }
+        }
       }
 
     /* 2)
@@ -430,23 +440,26 @@ namespace ns3
     */
     if(!condition_verified && (now-lastCamGen>=m_T_GenCam_ms))
       {
-         cam_error=generateAndEncodeCam ();
-         if(cam_error==CAMV1_NO_ERROR)
-           {
+        if (m_T_next_dcc == -1 || now - lastCamGen >= m_T_next_dcc)
+        {
+          cam_error=generateAndEncodeCam ();
+          if(cam_error==CAMV1_NO_ERROR)
+            {
 
-             if(dyn_cond_verified==true)
-               {
-                 m_N_GenCam++;
-                 if(m_N_GenCam>=m_N_GenCamMax)
-                   {
-                     m_N_GenCam=0;
-                     m_T_GenCam_ms=T_GenCamMax_ms;
-                     dyn_cond_verified=false;
-                   }
-               }
-           } else {
-             NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
-           }
+              if(dyn_cond_verified==true)
+                {
+                  m_N_GenCam++;
+                  if(m_N_GenCam>=m_N_GenCamMax)
+                    {
+                      m_N_GenCam=0;
+                      m_T_GenCam_ms=T_GenCamMax_ms;
+                      dyn_cond_verified=false;
+                    }
+                }
+            } else {
+              NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
+            }
+        }
       }
 
     m_event_camCheckConditions = Simulator::Schedule (MilliSeconds(m_T_CheckCamGen_ms), &CABasicServiceV1::checkCamConditions, this);
@@ -957,18 +970,21 @@ namespace ns3
     double aux = m_Ton_pp / delta * (m_T_CheckCamGen_ms - waiting) / m_T_CheckCamGen_ms + waiting;
     aux = std::max (aux, 25.0);
     double new_gen_time = std::min (aux, 1000.0);
-    setCheckCamGenMs ((long) new_gen_time);
+    setNextCAMDCC ((long) new_gen_time);
     m_last_delta = delta;
   }
 
   void
   CABasicServiceV1::toffUpdateAfterTransmission()
   {
-    if (m_last_delta == 0)
-      return;
-    double aux = m_Ton_pp / m_last_delta;
-    double new_gen_time = std::max(aux, 25.0);
-    new_gen_time = std::min(new_gen_time, 1000.0);
-    setCheckCamGenMs ((long) new_gen_time);
+    if (m_use_adaptive_dcc)
+    {
+      if (m_last_delta == 0)
+        return;
+      double aux = m_Ton_pp / m_last_delta;
+      double new_gen_time = std::max(aux, 25.0);
+      new_gen_time = std::min(new_gen_time, 1000.0);
+      setNextCAMDCC ((long) new_gen_time);
+    }
   }
 }

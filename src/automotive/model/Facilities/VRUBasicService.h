@@ -88,10 +88,10 @@ public:
     const long T_GenVamMax_ms = 5000;
 
     /**
-     * @brief Set the next time to check VAM condition
-     * @param nextVAM The next time to check VAM condition
+     * @brief Set the future time to send a VAM
+     * @param nextVAM The next time to send VAM
      */
-    void setCheckVamGenMs(long nextVAM) {m_T_CheckVamGen_ms = nextVAM;};
+    void setNextVAMDCC(long nextVAM) {m_T_next_dcc = nextVAM;};
 
     /**
      * @brief Used for DCC Adaptive approach to set the future time to check VAM condition after an update of delta value
@@ -107,11 +107,15 @@ public:
 
     void SetLogTriggering(bool log, std::string log_filename) {m_log_triggering = log; m_log_filename = log_filename;};
 
-    void write_log_triggering(bool condition_verified, bool vamredmit_verified, float head_diff, float pos_diff, float speed_diff, long time_difference, std::string data_head, std::string data_pos, std::string data_speed, std::string data_safed, std::string data_time, std::string data_vamredmit);
+    void write_log_triggering(bool condition_verified, bool vamredmit_verified, float head_diff, float pos_diff, float speed_diff, long time_difference, std::string data_head, std::string data_pos, std::string data_speed, std::string data_safed, std::string data_time, std::string data_vamredmit, std::string data_dcc);
 
     std::string printMinDist(double minDist) {
       return ((minDist>-DBL_MAX && minDist<MAXFLOAT) ? std::to_string(minDist) : "unavailable");
     }
+
+    double getTon() {return m_Ton_pp;};
+
+    void setAdaptiveDCC() {m_use_adaptive_dcc = true;};
 
 private:
     void initDissemination();
@@ -203,6 +207,9 @@ private:
     uint64_t m_head_sent = 0;
     uint64_t m_safedist_sent = 0;
     uint64_t m_time_sent = 0;
+
+    bool m_use_adaptive_dcc = false;
+    long m_T_next_dcc = -1;
 };
 
 }

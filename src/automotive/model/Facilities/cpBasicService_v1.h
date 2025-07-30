@@ -19,6 +19,14 @@ extern "C" {
 #include "ns3/CPMV1.h"
 }
 
+/*
+A DCC algorithm may be used to limit access to the channel in congested scenarios. Thus the CPM generation rules
+may be impacted by access layer DCC. As a result, a CP message may be dropped by the access layer DCC. If this
+packet drop indication is fed back to the CPM generation function, this feedback can be used to re-consider adding the
+objects from the dropped packet to the pool of objects to be select for the next CP message generation event. The
+feedback mechanism can employ provisions from the cross-layer DCC functionality detailed in ETSI TS 103 175 [i.16].
+*/
+
 namespace ns3
 {
 
@@ -47,10 +55,10 @@ public:
   void disableRedundancyMitigation(){m_redundancy_mitigation = false;}
 
   /**
-     * @brief Set the future time to check CPM condition
-     * @param nextCPM The next time to check CPM condition
+     * @brief Set the future time to send a CPM
+     * @param nextCPM The next time to send CPM
      */
-  void setCheckCpmGenMs(long nextCPM) {m_N_GenCpm = nextCPM;};
+    void setNextCPMDCC(long nextCPM) {m_T_next_dcc = nextCPM;};
 
   const long T_GenCpmMin_ms = 100;
   const long T_GenCpm_ms = 100;
@@ -68,6 +76,10 @@ public:
      * @param delta new delta value calculated through DCC adaptive approach
      */
   void toffUpdateAfterTransmission();
+
+  double getTon() {return m_Ton_pp;};
+
+  void setAdaptiveDCC() {m_use_adaptive_dcc = true;};
 
 private:
 
@@ -126,6 +138,9 @@ private:
   double m_last_transmission = 0;
   double m_Ton_pp = 0;
   double m_last_delta = 0;
+
+  long m_T_next_dcc = -1;
+  bool m_use_adaptive_dcc = false;
 };
 }
 

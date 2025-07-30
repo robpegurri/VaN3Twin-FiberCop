@@ -193,10 +193,10 @@ namespace ns3
     void setProtectedCommunicationsZonesRSU(asn1cpp::Seq<RSUContainerHighFrequency> sequence) {m_protectedCommunicationsZonesRSU = sequence;}
 
     /**
-     * @brief Set the future time to check CAM condition
-     * @param nextCAM The next time to check CAM condition
+     * @brief Set the future time to send a CAM
+     * @param nextCAM The next time to send CAM
      */
-    void setCheckCamGenMs(long nextCAM) {m_T_CheckCamGen_ms = nextCAM;};
+    void setNextCAMDCC(long nextCAM) {m_T_next_dcc = nextCAM;};
 
     /**
      * @brief Used for DCC Adaptive approach to set the future time to check CAM condition after an update of delta value
@@ -222,8 +222,11 @@ namespace ns3
 
     void SetLogTriggering(bool log, std::string log_filename) {m_log_triggering = log; m_log_filename = log_filename;};
 
-    void write_log_triggering(bool condition_verified, float head_diff, float pos_diff, float speed_diff, long time_difference, std::string data_head, std::string data_pos, std::string data_speed, std::string data_time);
+    void write_log_triggering(bool condition_verified, float head_diff, float pos_diff, float speed_diff, long time_difference, std::string data_head, std::string data_pos, std::string data_speed, std::string data_time, std::string data_dcc);
 
+    double getTon() {return m_Ton_pp;};
+
+    void setAdaptiveDCC() {m_use_adaptive_dcc = true;};
 
   private:
     const size_t m_MaxPHLength = 23;
@@ -333,6 +336,9 @@ namespace ns3
     uint64_t m_speed_sent = 0;
     uint64_t m_head_sent = 0;
     uint64_t m_time_sent = 0;
+
+    long m_T_next_dcc = -1;
+    bool m_use_adaptive_dcc = false;
   };
 }
 

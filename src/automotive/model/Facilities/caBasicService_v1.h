@@ -63,10 +63,10 @@ namespace ns3
     void startCamDissemination(double desync_s);
 
     /**
-     * @brief Set the future time to check CAM condition
-     * @param nextCAM The next time to check CAM condition
+     * @brief Set the future time to send a CAM
+     * @param nextCAM The next time to send CAM
      */
-    void setCheckCamGenMs(long nextCAM) {m_T_CheckCamGen_ms = nextCAM;};
+    void setNextCAMDCC(long nextCAM) {m_T_next_dcc = nextCAM;};
 
     //High frequency RSU container setters
     void setProtectedCommunicationsZonesRSU(asn1cpp::Seq<RSUContainerHighFrequencyV1> sequence) {m_protectedCommunicationsZonesRSU = sequence;}
@@ -87,6 +87,10 @@ namespace ns3
 
     const long T_GenCamMin_ms = 100;
     const long T_GenCamMax_ms = 1000;
+
+    double getTon() {return m_Ton_pp;};
+
+    void setAdaptiveDCC() {m_use_adaptive_dcc = true;};
 
   private:
     const size_t m_MaxPHLength = 23;
@@ -155,6 +159,9 @@ namespace ns3
     double m_last_transmission = 0;
     double m_Ton_pp = 0;
     double m_last_delta = 0;
+
+    long m_T_next_dcc = -1;
+    bool m_use_adaptive_dcc = false;
   };
 }
 

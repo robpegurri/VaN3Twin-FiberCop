@@ -121,7 +121,11 @@ public:
   void setRedundancyMitigation(bool choice){m_redundancy_mitigation = choice;}
   void disableRedundancyMitigation(){m_redundancy_mitigation = false;}
 
-  void setCheckCpmGenMs(long nextCPM) {m_N_GenCpm=nextCPM;};
+  /**
+     * @brief Set the future time to send a CPM
+     * @param nextCPM The next time to send CPM
+     */
+    void setNextCPMDCC(long nextCPM) {m_T_next_dcc = nextCPM;};
 
   const long T_GenCpmMin_ms = 100;
   const long T_GenCpm_ms = 100;
@@ -139,6 +143,10 @@ public:
      * @param delta new delta value calculated through DCC adaptive approach
      */
   void toffUpdateAfterTransmission();
+
+  double getTon() {return m_Ton_pp;};
+
+  void setAdaptiveDCC() {m_use_adaptive_dcc = true;};
 
 
 private:
@@ -206,6 +214,9 @@ private:
   double m_last_transmission = 0;
   double m_Ton_pp = 0;
   double m_last_delta = 0;
+
+  long m_T_next_dcc = -1;
+  bool m_use_adaptive_dcc = false;
 };
 }
 #endif // CPBASICSERVICE_H

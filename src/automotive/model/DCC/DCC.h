@@ -39,6 +39,7 @@ public:
   typedef struct ReactiveParameters {
     double cbr_threshold;
     double tx_power;
+    double data_rate;
     long tx_inter_packet_time;
     double sensitivity;
   } ReactiveParameters;
@@ -51,65 +52,74 @@ public:
   DCC ();
   ~DCC();
 
+  const std::unordered_map<ReactiveState, ReactiveParameters> m_reactive_parameters_Ton_1ms = 
+  {
+    {Relaxed,     {0.3, 24.0, -1, 100, -95.0}},
+    {Active1,     {0.4, 18.0, -1, 200,  -95.0}},
+    {Active2,     {0.5, 12.0, -1, 400, -95.0}},
+    {Active3,     {0.6, 6.0, -1, 500, -95.0}},
+    {Restrictive, {1.0, 2.0, -1, 1000, -65.0}}
+  };
+
+  const std::unordered_map<ReactiveState, ReactiveParameters> m_reactive_parameters_Ton_500_us = 
+  {
+    {Relaxed,     {0.3, 24.0, -1, 50, -95.0}},
+    {Active1,     {0.4, 18.0, -1, 100,  -95.0}},
+    {Active2,     {0.5, 12.0, -1, 200, -95.0}},
+    {Active3,     {0.65, 6.0, -1, 250, -95.0}},
+    {Restrictive, {1.0, 2.0, -1, 1000, -65.0}}
+  };
+
   /**
-   * \brief Set the metric supervisor
-   *
-   * \param metric_supervisor Pointer to the MetricSupervisor object
-   */
-  void SetMetricSupervisor(Ptr<MetricSupervisor> metric_supervisor) {m_metric_supervisor = metric_supervisor;};
-  /**
-   * \brief Set the TraciClient
-   *
-   * \param traci_client Pointer to the TraciClient object
-   */
-  void SetTraciClient(Ptr<TraciClient> traci_client) {m_traci_client = traci_client;};
-   /**
-    * \brief Set the reactive interval
+    * \brief Setup DCC
     *
-    * \param reactive_interval Time interval for DCC
+    * \param item_id item id
+    * \param node node object
+    * \param modality modality of DCC, can be "reactive" or "adaptive"
+    * \param dcc_interval time interval DCC
+    * \param traci_client pointer to MetricSupervisor 
     */
-  void SetDCCInterval(Time dcc_interval) {m_dcc_interval = dcc_interval;};
+  void SetupDCC(std::string item_id, Ptr<Node> node, std::string modality, uint32_t dcc_interval, Ptr<MetricSupervisor> traci_client); 
  /**
     * \brief Set the CAM Basic Service
     *
     * \param nodeID id of the node
     * \param caBasicService basic service for CAMs
     */
-  void AddCABasicService(std::string nodeID, Ptr<CABasicService> caBasicService) {m_caService[nodeID] = caBasicService;};
+  void AddCABasicService(Ptr<CABasicService> caBasicService) {m_caService = caBasicService;};
   /**
     * \brief Set the CAM Basic Service (Version 1)
     *
     * \param nodeID id of the node
     * \param caBasicService basic service for CAMs
     */
-  void AddCABasicServiceV1(std::string nodeID, Ptr<CABasicServiceV1> caBasicService) {m_caServiceV1[nodeID] = caBasicService;};
+  void AddCABasicServiceV1(Ptr<CABasicServiceV1> caBasicService) {m_caServiceV1 = caBasicService;};
   /**
     * \brief Set the CPM Basic Service
     *
     * \param nodeID id of the node
     * \param cpBasicService basic service for CPMs
     */
-  void AddCPBasicService(std::string nodeID, Ptr<CPBasicService> cpBasicService) {m_cpService[nodeID] = cpBasicService;};
+  void AddCPBasicService(Ptr<CPBasicService> cpBasicService) {m_cpService = cpBasicService;};
   /**
     * \brief Set the CPM Basic Service (Version 1)
     *
     * \param nodeID id of the node
     * \param cpBasicService basic service for CPMs
     */
-  void AddCPBasicService(std::string nodeID, Ptr<CPBasicServiceV1> cpBasicService) {m_cpServiceV1[nodeID] = cpBasicService;};
+  void AddCPBasicService(Ptr<CPBasicServiceV1> cpBasicService) {m_cpServiceV1 = cpBasicService;};
   /**
     * \brief Set the VRU Basic Service
     *
     * \param nodeID id of the node
     * \param vruBasicService basic service for VRUs
     */
-  void AddVRUBasicService(std::string nodeID, Ptr<VRUBasicService> vruBasicService) {m_vruService[nodeID] = vruBasicService;};
-    /**
-     * \brief Set the DCC modality (reactive or proactive)
-     *
-     * \param reactive Boolean to indicate if the DCC is reactive or proactive
-     */
-  void SetReactive(bool reactive) {m_reactive = reactive;};
+  void AddVRUBasicService(std::string nodeID, Ptr<VRUBasicService> vruBasicService) {m_vruService = vruBasicService;};
+
+  void StartDCC();
+
+private:
+
   /**
    * \brief Start the reactive DCC mechanism
    *
@@ -121,23 +131,24 @@ public:
    */
   void adaptiveDCC();
 
+  std::unordered_map<ReactiveState, ReactiveParameters> DCC::getConfiguration(double Ton, double currentCBR);
 
-private:
+  std::string m_item_id;
+  Ptr<Node> m_node;
 
-  bool m_reactive = true; //!< Boolean to indicate if the DCC is reactive or proactive
-  Time m_dcc_interval = Time(-1.0); //!< Time interval for DCC
+  std::string m_modality = ""; //!< Boolean to indicate if the DCC is reactive or adaptive
+  uint32_t m_dcc_interval = -1; //!< Time interval for DCC
   Ptr<MetricSupervisor> m_metric_supervisor = NULL; //!< Pointer to the MetricSupervisor object
   Ptr<TraciClient> m_traci_client = NULL; //!< Pointer to the TraciClient object
-  std::unordered_map<std::string, Ptr<CABasicService>> m_caService; //!< Pointer to the CABasicService object
-  std::unordered_map<std::string, Ptr<CABasicServiceV1>> m_caServiceV1; //!< Pointer to the CABasicService object
-  std::unordered_map<std::string, Ptr<CPBasicService>> m_cpService; //!< Pointer to the CPBasicService object
-  std::unordered_map<std::string, Ptr<CPBasicServiceV1>> m_cpServiceV1; //!< Pointer to the CPBasicService object
-  std::unordered_map<std::string, Ptr<VRUBasicService>> m_vruService; //!< Pointer to the VRUBasicService object
-  //Ptr<NrHelper> m_nr_helper = nullptr; //!< Pointer to the NRHelper object
+  Ptr<CABasicService> m_caService; //!< Pointer to the CABasicService object
+  Ptr<CABasicServiceV1> m_caServiceV1; //!< Pointer to the CABasicService object
+  Ptr<CPBasicService> m_cpService; //!< Pointer to the CPBasicService object
+  Ptr<CPBasicServiceV1> m_cpServiceV1; //!< Pointer to the CPBasicService object
+  Ptr<VRUBasicService> m_vruService; //!< Pointer to the VRUBasicService object
+  ReactiveState m_current_state = ReactiveState::Relaxed;
 
-  std::unordered_map<std::string, DCC::ReactiveState> m_vehicle_state; //!< Map to store the state of each vehicle
-
-  std::unordered_map<std::string, double> m_CBR_its;
+  bool m_time_to_do_steps = false;
+  double m_CBR_its = -1;
   double m_alpha = 0.016;
   double m_beta = 0.0012;
   double m_CBR_target = 0.68;
@@ -146,8 +157,7 @@ private:
   double m_Gmax = 0.0005;
   double m_Gmin = -0.00025;
   double m_delta = 0;
-
-  std::unordered_map<ReactiveState, ReactiveParameters> m_reactive_parameters;
+  double m_previous_cbr;
 
 };
 

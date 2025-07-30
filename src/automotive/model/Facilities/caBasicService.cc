@@ -132,7 +132,7 @@ namespace ns3
     m_vehicle=is_vehicle;
   }
 
-  void CABasicService::write_log_triggering(bool condition_verified, float head_diff, float pos_diff, float speed_diff, long time_difference, std::string data_head, std::string data_pos, std::string data_speed, std::string data_time)
+  void CABasicService::write_log_triggering(bool condition_verified, float head_diff, float pos_diff, float speed_diff, long time_difference, std::string data_head, std::string data_pos, std::string data_speed, std::string data_time, std::string data_dcc)
   {
     if (m_log_triggering && m_log_filename != "")
       {
@@ -214,7 +214,7 @@ namespace ns3
                 " PosDiff=" + std::to_string (pos_diff) +
                 " SpeedDiff=" + std::to_string (speed_diff) +
                 " TimeDiff=" + std::to_string (time_difference) + "\n";
-        data = data + data_head + data_pos + data_speed + data_time;
+        data = data + data_head + data_pos + data_speed + data_time + data_dcc;
 
         data = data + "\n";
 
@@ -454,6 +454,7 @@ namespace ns3
     std::string data_pos;
     std::string data_speed;
     std::string data_time;
+    std::string data_dcc;
 
     // If no initial CAM has been triggered before checkCamConditions() has been called, throw an error
     if(m_prev_heading==-1 || m_prev_speed==-1 || m_prev_distance==-1)
@@ -475,15 +476,23 @@ namespace ns3
     data_head="[HEADING] HeadingUnavailable="+std::to_string((float)HeadingValue_unavailable/10)+" PrevHead="+std::to_string(m_prev_heading/10)+" CurrHead="+std::to_string(m_vdp->getHeadingValue ())+" HeadDiff="+std::to_string(head_diff)+"\n";
     if (head_diff > 4.0 || head_diff < -4.0)
       {
-        cam_error=generateAndEncodeCam ();
-        if(cam_error==CAM_NO_ERROR)
-          {
-            m_N_GenCam=0;
-            condition_verified=true;
-            dyn_cond_verified=true;
-          } else {
-            NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
-          }
+        if (m_T_next_dcc == -1 || now - lastCamGen >= m_T_next_dcc)
+        {
+          cam_error=generateAndEncodeCam ();
+          if(cam_error==CAM_NO_ERROR)
+            {
+              m_N_GenCam=0;
+              condition_verified=true;
+              dyn_cond_verified=true;
+            } else {
+              NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
+            }
+        }
+        else
+        {
+          data_dcc += "[HEADING] verified but [DCC] doesn't allow sending\n";
+        }
+        
       }
 
     /* 1b)
@@ -495,15 +504,22 @@ namespace ns3
     data_pos="[DISTANCE] PrevLat="+std::to_string(m_prev_position.lat)+" PrevLon="+std::to_string(m_prev_position.lon)+" CurrLat="+std::to_string(m_vdp->getPosition().lat)+" CurrLon="+std::to_string(m_vdp->getPosition().lon)+" PosDiff="+std::to_string(pos_diff)+"\n";
     if (!condition_verified && (pos_diff > 4.0 || pos_diff < -4.0))
       {
-        cam_error=generateAndEncodeCam ();
-        if(cam_error==CAM_NO_ERROR)
-          {
-            m_N_GenCam=0;
-            condition_verified=true;
-            dyn_cond_verified=true;
-          } else {
-            NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
-          }
+        if (m_T_next_dcc == -1 || now - lastCamGen >= m_T_next_dcc)
+        {
+          cam_error=generateAndEncodeCam ();
+          if(cam_error==CAM_NO_ERROR)
+            {
+              m_N_GenCam=0;
+              condition_verified=true;
+              dyn_cond_verified=true;
+            } else {
+              NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
+            }
+        }
+        else
+        {
+          data_dcc += "[DISTANCE] verified but [DCC] doesn't allow sending\n";
+        }
       }
 
     /* 1c)
@@ -515,15 +531,22 @@ namespace ns3
     data_speed="[SPEED] SpeedUnavailable="+std::to_string((float)SpeedValue_unavailable)+" PrevSpeed="+std::to_string(m_prev_speed)+" CurrSpeed="+std::to_string(m_vdp->getSpeedValue ())+" SpeedDiff="+std::to_string(speed_diff)+"\n";
     if (!condition_verified && (speed_diff > 0.5 || speed_diff < -0.5))
       {
-        cam_error=generateAndEncodeCam ();
-        if(cam_error==CAM_NO_ERROR)
-          {
-            m_N_GenCam=0;
-            condition_verified=true;
-            dyn_cond_verified=true;
-          } else {
-            NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
-          }
+        if (m_T_next_dcc == -1 || now - lastCamGen >= m_T_next_dcc)
+        {
+          cam_error=generateAndEncodeCam ();
+          if(cam_error==CAM_NO_ERROR)
+            {
+              m_N_GenCam=0;
+              condition_verified=true;
+              dyn_cond_verified=true;
+            } else {
+              NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
+            }
+        }
+        else
+        {
+          data_dcc += "[SPEED] verified but [DCC] doesn't allow sending\n";
+        }
       }
 
     /* 2)
@@ -533,26 +556,33 @@ namespace ns3
     data_time="[TIME] Timestamp="+std::to_string(now)+" LastCAMSend="+std::to_string(lastCamGen)+" NumThreshold="+std::to_string(m_N_GenCamMax)+" NumCAM="+std::to_string(m_N_GenCam)+" TimeThreshold="+std::to_string(m_T_GenCam_ms)+" TimeDiff="+std::to_string(time_difference)+" TimeNextCAM="+std::to_string(m_T_GenCam_ms - time_difference)+"\n";
     if(!condition_verified && (now-lastCamGen>=m_T_GenCam_ms))
       {
-         cam_error=generateAndEncodeCam ();
-         if(cam_error==CAM_NO_ERROR)
-           {
-             condition_verified = true;
-             if(dyn_cond_verified==true)
-               {
-                 m_N_GenCam++;
-                 if(m_N_GenCam>=m_N_GenCamMax)
-                   {
-                     m_N_GenCam=0;
-                     m_T_GenCam_ms=T_GenCamMax_ms;
-                     dyn_cond_verified=false;
-                   }
-               }
-           } else {
-             NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
-           }
+        if (m_T_next_dcc == -1 || now - lastCamGen >= m_T_next_dcc)
+        {
+          cam_error=generateAndEncodeCam ();
+          if(cam_error==CAM_NO_ERROR)
+            {
+              condition_verified = true;
+              if(dyn_cond_verified==true)
+                {
+                  m_N_GenCam++;
+                  if(m_N_GenCam>=m_N_GenCamMax)
+                    {
+                      m_N_GenCam=0;
+                      m_T_GenCam_ms=T_GenCamMax_ms;
+                      dyn_cond_verified=false;
+                    }
+                }
+            } else {
+              NS_LOG_ERROR("Cannot generate CAM. Error code: "<<cam_error);
+            }
+        }
+        else
+        {
+          data_dcc += "[TIME] verified but [DCC] doesn't allow sending\n";
+        }
       }
 
-    write_log_triggering (condition_verified, head_diff, pos_diff, speed_diff, time_difference, data_head, data_pos, data_speed, data_time);
+    write_log_triggering (condition_verified, head_diff, pos_diff, speed_diff, time_difference, data_head, data_pos, data_speed, data_time, data_dcc);
 
     m_event_camCheckConditions = Simulator::Schedule (MilliSeconds(m_T_CheckCamGen_ms), &CABasicService::checkCamConditions, this);
   }
@@ -1070,18 +1100,21 @@ namespace ns3
     double aux = m_Ton_pp / delta * (m_T_CheckCamGen_ms - waiting) / m_T_CheckCamGen_ms + waiting;
     aux = std::max (aux, 25.0);
     double new_gen_time = std::min (aux, 1000.0);
-    setCheckCamGenMs ((long) new_gen_time);
+    setNextCAMDCC ((long) new_gen_time);
     m_last_delta = delta;
   }
 
   void
   CABasicService::toffUpdateAfterTransmission()
   {
-    if (m_last_delta == 0)
-      return;
-    double aux = m_Ton_pp / m_last_delta;
-    double new_gen_time = std::max(aux, 25.0);
-    new_gen_time = std::min(new_gen_time, 1000.0);
-    setCheckCamGenMs ((long) new_gen_time);
+    if (m_use_adaptive_dcc)
+    {
+      if (m_last_delta == 0)
+        return;
+      double aux = m_Ton_pp / m_last_delta;
+      double new_gen_time = std::max(aux, 25.0);
+      new_gen_time = std::min(new_gen_time, 1000.0);
+      setNextCAMDCC ((long) new_gen_time);
+    }
   }
 }

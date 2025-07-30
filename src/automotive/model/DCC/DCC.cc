@@ -31,121 +31,162 @@ DCC::GetTypeId ()
   return tid;
 }
 
-DCC::DCC ()
-{
-  m_reactive_parameters[ReactiveState::Relaxed] = {0.20, 24.0, 100, -95.0};
-  m_reactive_parameters[ReactiveState::Active1] = {0.30, 18.0, 200, -95.0};
-  m_reactive_parameters[ReactiveState::Active2] = {0.40, 12.0, 400, -95.0};
-  m_reactive_parameters[ReactiveState::Active3] = {0.50, 6.0, 500, -95.0};
-  m_reactive_parameters[ReactiveState::Restrictive] = {1.0, 2.0, 1000, -65.0};
-}
+DCC::DCC () = default;
 
 DCC::~DCC()
 = default;
+
+std::unordered_map<DCC::ReactiveState, DCC::ReactiveParameters> DCC::getConfiguration(double Ton, double currentCBR)
+{
+    std::unordered_map<DCC::ReactiveState, DCC::ReactiveParameters> map;
+    ReactiveState old_state = m_current_state;
+    if (currentCBR >= map[m_current_state].cbr_threshold && m_current_state != ReactiveState::Restrictive)
+    {
+      m_current_state = static_cast<ReactiveState>(m_current_state + 1);
+    }
+    else
+    {
+      if (m_current_state != ReactiveState::Relaxed)
+      {
+        ReactiveState prev_state = static_cast<ReactiveState> (m_current_state - 1);
+        if (currentCBR <= map[prev_state].cbr_threshold)
+        {
+          m_current_state = static_cast<ReactiveState>(m_current_state - 1);
+        }
+      }
+    }
+    if (old_state != m_current_state)
+    {
+      if (Ton < 0.5)
+      {
+        map = m_reactive_parameters_Ton_500_us;
+      }
+      else if (Ton < 1)
+      {
+        map = m_reactive_parameters_Ton_1ms;
+      }
+      else
+      {
+        // Default
+        map = m_reactive_parameters_Ton_1ms;
+      }
+    }
+    return map;
+}
+
+void DCC::SetupDCC(std::string item_id, Ptr<Node> node, std::string modality, uint32_t dcc_interval, Ptr<MetricSupervisor> traci_client)
+{
+  m_item_id = item_id;
+  m_node = node;
+  NS_ASSERT_MSG (modality == "adaptive" || modality == "reactive", "DCC modality can be only "adaptive" or "reactive"");
+  m_modality = modality;
+  m_dcc_interval = modality == "reactive" ? dcc_interval : dcc_interval / 2;
+  m_traci_client = traci_client;
+}
+
+void DCC::StartDCC()
+{
+  if (m_modality == "adaptive")
+  {
+    if (m_caServiceV1 != nullptr) m_caServiceV1->setAdaptiveDCC();
+    if (m_caService != nullptr) m_caService->setAdaptiveDCC();
+    if (m_cpServiceV1 != nullptr) m_cpServiceV1->setAdaptiveDCC();
+    if (m_cpService != nullptr) m_cpService->setAdaptiveDCC();
+    if (m_vruService != nullptr) m_vruService->setAdaptiveDCC();
+    adaptiveDCC();
+  }
+  else
+  {
+    reactiveDCC();
+  }
+}
 
 void DCC::reactiveDCC()
 {
   NS_LOG_INFO("Starting DCC check");
   NS_ASSERT_MSG (m_metric_supervisor != nullptr, "Metric Supervisor not set");
-  NS_ASSERT_MSG (m_dcc_interval != Time(Seconds(-1.0)), "DCC interval not set");
+  NS_ASSERT_MSG (m_dcc_interval != -1, "DCC interval not set");
 
-  std::unordered_map<std::string, std::vector<double>> cbrs = m_metric_supervisor->getCBRValues();
-  for (auto it = cbrs.begin(); it != cbrs.end(); ++it)
+  double currentCBR = m_metric_supervisor->getCBRPerItem(m_item_id);
+  // Get the NetDevice
+  Ptr<NetDevice> netDevice = m_node->GetDevice (0);
+  Ptr<WifiNetDevice> wifiDevice;
+  Ptr<WifiPhy> phy80211p = nullptr;
+  // Get the WifiNetDevice
+  wifiDevice = DynamicCast<WifiNetDevice> (netDevice);
+  if (wifiDevice == nullptr)
+  {
+    NS_FATAL_ERROR("WiFi Device object not found.");
+  }
+  // Get the PHY layer
+  phy80211p = wifiDevice->GetPhy ();
+
+  if (m_caServiceV1 != nullptr)
+  {
+    double Ton = m_caServiceV1->getTon(); // Milliseconds
+    std::unordered_map<ReactiveState, ReactiveParameters> map = getConfiguration(Ton, currentCBR);
+    if (!map.empty())
     {
-      std::string id = it->first;
-      double current_cbr = it->second.back();
-      bool found = false;
-      ReactiveState old_state;
-      ReactiveState new_state;
-      if (m_vehicle_state.find(id) != m_vehicle_state.end())
-        {
-          found = true;
-          old_state = m_vehicle_state[id];
-        }
-
-      if (found)
-        {
-          bool relaxed_flag = true ? old_state == ReactiveState::Relaxed : false;
-          if (current_cbr > m_reactive_parameters[old_state].cbr_threshold)
-            {
-              new_state = static_cast<ReactiveState> (old_state + 1);
-            }
-          else if (relaxed_flag)
-            {
-              new_state = ReactiveState::Relaxed;
-            }
-          else if (current_cbr <
-                   m_reactive_parameters[static_cast<ReactiveState> (old_state - 1)].cbr_threshold)
-            {
-              new_state = static_cast<ReactiveState> (old_state - 1);
-            }
-          else
-            {
-              new_state = old_state;
-            }
-        }
-      else
-        {
-          for (int foo_int = ReactiveState::Relaxed; foo_int != ReactiveState::Restrictive; foo_int++)
-            {
-              ReactiveState foo = static_cast<ReactiveState>(foo_int);
-              if (current_cbr < m_reactive_parameters[foo].cbr_threshold)
-                {
-                  new_state = foo;
-                  break;
-                }
-            }
-        }
-
-      // Get the NetDevice
-      int nodeID_int = m_traci_client->get_NodeMap()[id].second->GetId();
-      std::string nodeID_str = std::to_string (nodeID_int);
-      Ptr<NetDevice> netDevice = m_traci_client->get_NodeMap()[id].second->GetDevice (0);
-      Ptr<WifiNetDevice> wifiDevice;
-
-      Ptr<WifiPhy> phy80211p = nullptr;
-
-      // Get the WifiNetDevice
-      wifiDevice = DynamicCast<WifiNetDevice> (netDevice);
-
-      if (wifiDevice != nullptr)
-        {
-          // Get the PHY layer
-          phy80211p = wifiDevice->GetPhy ();
-        }
-
-        if (phy80211p != nullptr)
-          {
-            phy80211p->SetTxPowerStart (m_reactive_parameters[new_state].tx_power);
-            phy80211p->SetTxPowerEnd (m_reactive_parameters[new_state].tx_power);
-            phy80211p->SetRxSensitivity (m_reactive_parameters[new_state].sensitivity);
-          }
-
-        if (m_caService.find(nodeID_str) != m_caService.end())
-          {
-            m_caService[nodeID_str]->setCheckCamGenMs (m_reactive_parameters[new_state].tx_inter_packet_time);
-          }
-        if (m_caServiceV1.find(nodeID_str) != m_caServiceV1.end())
-          {
-            m_caServiceV1[nodeID_str]->setCheckCamGenMs (m_reactive_parameters[new_state].tx_inter_packet_time);
-          }
-        if (m_cpService.find(nodeID_str) != m_cpService.end())
-          {
-            m_cpService[nodeID_str]->setCheckCpmGenMs (m_reactive_parameters[new_state].tx_inter_packet_time);
-          }
-        if (m_cpServiceV1.find(nodeID_str) != m_cpServiceV1.end())
-          {
-            m_cpServiceV1[nodeID_str]->setCheckCpmGenMs (m_reactive_parameters[new_state].tx_inter_packet_time);
-          }
-        if(m_vruService.find(nodeID_str) != m_vruService.end())
-          {
-            m_vruService[nodeID_str]->setCheckVamGenMs (m_reactive_parameters[new_state].tx_inter_packet_time);
-          }
-
-      m_vehicle_state[id] = new_state;
+      phy80211p->SetTxPowerStart (map[m_current_state].tx_power);
+      phy80211p->SetTxPowerEnd (map[m_current_state].tx_power);
+      phy80211p->SetRxSensitivity (map[m_current_state].sensitivity);
+      m_caServiceV1->setNextCAMDCC (map[m_current_state].tx_inter_packet_time);
     }
+  }
 
-  Simulator::Schedule(m_dcc_interval, &DCC::reactiveDCC, this);
+  if (m_caService != nullptr)
+  {
+    double Ton = m_caService->getTon(); // Milliseconds
+    std::unordered_map<ReactiveState, ReactiveParameters> map = getConfiguration(Ton, currentCBR);
+    if (!map.empty())
+    {
+      phy80211p->SetTxPowerStart (map[m_current_state].tx_power);
+      phy80211p->SetTxPowerEnd (map[m_current_state].tx_power);
+      phy80211p->SetRxSensitivity (map[m_current_state].sensitivity);
+      m_caService->setNextCAMDCC (map[m_current_state].tx_inter_packet_time);
+    }
+  }
+
+  if (m_cpServiceV1 != nullptr)
+  {
+    double Ton = m_cpServiceV1->getTon(); // Milliseconds
+    std::unordered_map<ReactiveState, ReactiveParameters> map = getConfiguration(Ton, currentCBR);
+    if (!map.empty())
+    {
+      phy80211p->SetTxPowerStart (map[m_current_state].tx_power);
+      phy80211p->SetTxPowerEnd (map[m_current_state].tx_power);
+      phy80211p->SetRxSensitivity (map[m_current_state].sensitivity);
+      m_cpServiceV1->setNextCPMDCC (map[m_current_state].tx_inter_packet_time);
+    }
+  }
+
+  if (m_cpService != nullptr)
+  {
+    double Ton = m_cpService->getTon(); // Milliseconds
+    std::unordered_map<ReactiveState, ReactiveParameters> map = getConfiguration(Ton, currentCBR);
+    if (!map.empty())
+    {
+      phy80211p->SetTxPowerStart (map[m_current_state].tx_power);
+      phy80211p->SetTxPowerEnd (map[m_current_state].tx_power);
+      phy80211p->SetRxSensitivity (map[m_current_state].sensitivity);
+      m_cpService->setNextCPMDCC (map[m_current_state].tx_inter_packet_time);
+    }
+  }
+
+  if (m_vruService != nullptr)
+  {
+    double Ton = m_vruService->getTon(); // Milliseconds
+    std::unordered_map<ReactiveState, ReactiveParameters> map = getConfiguration(Ton, currentCBR);
+    if (!map.empty())
+    {
+      phy80211p->SetTxPowerStart (map[m_current_state].tx_power);
+      phy80211p->SetTxPowerEnd (map[m_current_state].tx_power);
+      phy80211p->SetRxSensitivity (map[m_current_state].sensitivity);
+      m_vruService->setNextVAMDCC (map[m_current_state].tx_inter_packet_time);
+    }
+  }  
+
+  Simulator::Schedule(MilliSeconds(m_dcc_interval), &DCC::reactiveDCC, this);
 }
 
 void DCC::adaptiveDCC()
@@ -153,81 +194,76 @@ void DCC::adaptiveDCC()
   NS_LOG_INFO ("Starting DCC check");
   NS_ASSERT_MSG (m_traci_client != nullptr, "TraCI client not set");
   NS_ASSERT_MSG (m_metric_supervisor != nullptr, "Metric Supervisor not set");
-  NS_ASSERT_MSG (m_dcc_interval != Time (Seconds (-1.0)), "DCC interval not set");
+  NS_ASSERT_MSG (m_dcc_interval != -1.0, "DCC interval not set");
 
-  std::unordered_map<std::string, std::vector<double>> cbrs = m_metric_supervisor->getCBRValues ();
+  if (!m_time_to_do_steps)
+  {
+    m_previous_cbr = m_metric_supervisor->getCBRPerItem(m_item_id);
+    m_time_to_do_steps = true;
+  }
+  else
+  {
+    double currentCBR = m_metric_supervisor->getCBRPerItem(m_item_id);
+    double delta_offset;
+    // Step 1
+    if (m_CBR_its != -1)
+      {
+        m_CBR_its = 0.5 * m_CBR_its + 0.25 * ((currentCBR + m_previous_cbr) / 2);
+      }
+    else
+      {
+        m_CBR_its = (currentCBR + m_previous_cbr) / 2;
+      }
+    // Step 2
+    double factor1 = m_beta * (m_CBR_target - m_CBR_its);
+    if ((m_CBR_target - m_CBR_its) > 0)
+      {
+        delta_offset = factor1 < m_Gmax ? factor1 : m_Gmax;
+      }
+    else
+      {
+        delta_offset = factor1 > m_Gmin ? factor1 : m_Gmin;
+      }
 
-  for (auto it = cbrs.begin (); it != cbrs.end (); ++it)
-    {
-      std::string id = it->first;
-      int nodeID_int = m_traci_client->get_NodeMap ()[id].second->GetId ();
-      std::string nodeID_str = std::to_string (nodeID_int);
-      double current_cbr = it->second.back ();
-      double previous_cbr;
-      if (it->second.size() < 2)
-        {
-          previous_cbr = 0;
-        }
-      else
-        {
-          previous_cbr = it->second[it->second.size () - 2];
-        }
-      double delta_offset;
+    // Step 3
+    m_delta = (1 - m_alpha) * m_delta + delta_offset;
 
-      // Step 1
-      if (m_CBR_its.find(id) != m_CBR_its.end())
-        {
-          m_CBR_its[id] = 0.5 * m_CBR_its[id] + 0.25 * ((current_cbr + previous_cbr) / 2);
-        }
-      else
-        {
-          m_CBR_its[id] = (current_cbr + previous_cbr) / 2;
-        }
+    // Step 4
+    if (m_delta > m_delta_max)
+      {
+        m_delta = m_delta_max;
+      }
 
-      if ((m_CBR_target - m_CBR_its[id]) > 0) // Step 2
-        {
-          delta_offset = std::min (m_beta * (m_CBR_target - m_CBR_its[id]), m_Gmax);
-        }
-      else
-        {
-          delta_offset = std::max (m_beta * (m_CBR_target - m_CBR_its[id]), m_Gmin);
-        }
+    // Step 5
+    if (m_delta < m_delta_min)
+      {
+        m_delta = m_delta_min;
+      }
 
-      m_delta = (1 - m_alpha) * m_delta + delta_offset; // Step 3
+    if (m_caService != nullptr)
+      {
+        m_caService->toffUpdateAfterDeltaUpdate (m_delta);
+      }
+    if (m_caServiceV1 != nullptr)
+      {
+        m_caServiceV1->toffUpdateAfterDeltaUpdate (m_delta);
+      }
+    if (m_cpService != nullptr)
+      {
+        m_cpService->toffUpdateAfterDeltaUpdate(m_delta);
+      }
+    if (m_cpServiceV1 != nullptr)
+      {
+        m_cpServiceV1->toffUpdateAfterDeltaUpdate(m_delta);
+      }
+    if (m_vruService != nullptr)
+      {
+        m_vruService->toffUpdateAfterDeltaUpdate(m_delta);
+      }
+    m_time_to_do_steps = false;
+  }
 
-      if (m_delta > m_delta_max) // Step 4
-        {
-          m_delta = m_delta_max;
-        }
-
-      if (m_delta < m_delta_min) // Step 5
-        {
-          m_delta = m_delta_min;
-        }
-
-      if (m_caService.find (nodeID_str) != m_caService.end ())
-        {
-          m_caService[nodeID_str]->toffUpdateAfterDeltaUpdate (m_delta);
-        }
-      if (m_caServiceV1.find (nodeID_str) != m_caServiceV1.end ())
-        {
-          m_caServiceV1[nodeID_str]->toffUpdateAfterDeltaUpdate (m_delta);
-        }
-      if (m_cpService.find (nodeID_str) != m_cpService.end ())
-        {
-          m_cpService[nodeID_str]->toffUpdateAfterDeltaUpdate(m_delta);
-        }
-      if (m_cpServiceV1.find (nodeID_str) != m_cpServiceV1.end ())
-        {
-          m_cpServiceV1[nodeID_str]->toffUpdateAfterDeltaUpdate(m_delta);
-        }
-      if (m_vruService.find (nodeID_str) != m_vruService.end ())
-        {
-          m_vruService[nodeID_str]->toffUpdateAfterDeltaUpdate(m_delta);
-        }
-    }
-
-  Simulator::Schedule(m_dcc_interval, &DCC::adaptiveDCC, this);
+  Simulator::Schedule(MilliSeconds(m_dcc_interval), &DCC::adaptiveDCC, this);
 }
 
 }

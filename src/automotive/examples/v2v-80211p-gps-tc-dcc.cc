@@ -226,7 +226,7 @@ main (int argc, char *argv[])
   wifi80211p.SetRemoteStationManager ("ns3::ConstantRateWifiManager", "DataMode", StringValue (datarate_config), "ControlMode", StringValue (datarate_config));
   NetDeviceContainer netDevices = wifi80211p.Install (wifiPhy, wifi80211pMac, obuNodes);
 
-  wifiPhy.EnablePcap ("v2v-tracenx-long", netDevices);
+  wifiPhy.EnablePcap ("v2v-tracenx-dcc-A4", netDevices);
   /*** 4. Create Internet and ipv4 helpers ***/
   PacketSocketHelper packetSocket;
   packetSocket.Install (obuNodes);
@@ -294,7 +294,7 @@ main (int argc, char *argv[])
         {
           Simulator::ScheduleWithContext (nodeCounter,
                                           Seconds (1.0), &GenerateTraffic_interfering,
-                                          source_interfering, 1500, simTime*2000, MilliSeconds (3));
+                                          source_interfering, 1500 /* Size */, simTime*2000, MilliSeconds (3) /* Frequency */);
         }
 
       Ptr<Node> includedNode = obuNodes.Get(nodeCounter);

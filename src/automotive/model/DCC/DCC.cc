@@ -88,7 +88,7 @@ void DCC::SetupDCC(std::string item_id, Ptr<Node> node, std::string modality, ui
   m_item_id = item_id;
   m_node = node;
   m_modality = modality;
-  m_dcc_interval = modality == "reactive" ? dcc_interval : dcc_interval / 2;
+  m_dcc_interval = dcc_interval;
   m_metric_supervisor = met_sup;
 }
 
@@ -101,11 +101,12 @@ void DCC::StartDCC()
     if (m_cpServiceV1 != nullptr) m_cpServiceV1->setAdaptiveDCC();
     if (m_cpService != nullptr) m_cpService->setAdaptiveDCC();
     if (m_vruService != nullptr) m_vruService->setAdaptiveDCC();
-    adaptiveDCC();
+    Simulator::Schedule(MilliSeconds(m_T_CBR), &DCC::adaptiveDCCcheckCBR, this);
+    Simulator::Schedule(MilliSeconds(m_dcc_interval), &DCC::adaptiveDCC, this);
   }
   else
   {
-    reactiveDCC();
+    Simulator::Schedule(MilliSeconds(m_dcc_interval), &DCC::reactiveDCC, this);
   }
 }
 
@@ -121,6 +122,12 @@ void DCC::reactiveDCC()
       Simulator::Schedule(MilliSeconds(m_dcc_interval), &DCC::reactiveDCC, this);
       return;
     }
+  Time now = Simulator::Now ();
+  double time = now.GetSeconds ();
+  std::ofstream logFile;
+  logFile.open("cam-reception-log.csv", std::ios_base::app);
+  logFile << "Time: " << time << ", Listener: " << m_item_id << ", CBR: " << currentCBR << std::endl;
+  logFile.close();
   // Get the NetDevice
   Ptr<NetDevice> netDevice = m_node->GetDevice (0);
   Ptr<WifiNetDevice> wifiDevice;
@@ -202,83 +209,88 @@ void DCC::reactiveDCC()
   Simulator::Schedule(MilliSeconds(m_dcc_interval), &DCC::reactiveDCC, this);
 }
 
+void DCC::adaptiveDCCcheckCBR()
+{
+  NS_ASSERT_MSG (m_metric_supervisor != nullptr, "Metric Supervisor not set");
+  m_previous_cbr = m_metric_supervisor->getCBRPerItem(m_item_id);
+  if (m_previous_cbr == -1) m_previous_cbr = 0;
+  Simulator::Schedule(MilliSeconds(m_T_CBR), &DCC::adaptiveDCCcheckCBR, this);
+}
+
 void DCC::adaptiveDCC()
 {
   NS_LOG_INFO ("Starting DCC check");
   NS_ASSERT_MSG (m_metric_supervisor != nullptr, "Metric Supervisor not set");
   NS_ASSERT_MSG (m_dcc_interval != -1.0, "DCC interval not set");
 
-  if (!m_time_to_do_steps)
-  {
-    m_previous_cbr = m_metric_supervisor->getCBRPerItem(m_item_id);
-    if (m_previous_cbr == -1) m_previous_cbr = 0;
-    m_time_to_do_steps = true;
-  }
+  double currentCBR = m_metric_supervisor->getCBRPerItem(m_item_id);
+  if (currentCBR == -1)
+    {
+      Simulator::Schedule(MilliSeconds(m_dcc_interval), &DCC::adaptiveDCC, this);
+      return;
+    }
+  Time now = Simulator::Now ();
+  double time = now.GetSeconds ();
+  std::ofstream logFile;
+  logFile.open("cam-reception-log.csv", std::ios_base::app);
+  logFile << "Time: " << time << ", Listener: " << m_item_id << ", CBR: " << currentCBR << std::endl;
+  logFile.close();
+  double delta_offset;
+  // Step 1
+  if (m_CBR_its != -1)
+    {
+      m_CBR_its = 0.5 * m_CBR_its + 0.25 * ((currentCBR + m_previous_cbr) / 2);
+    }
   else
-  {
-    double currentCBR = m_metric_supervisor->getCBRPerItem(m_item_id);
-    if (currentCBR != -1)
-      {
-        double delta_offset;
-        // Step 1
-        if (m_CBR_its != -1)
-          {
-            m_CBR_its = 0.5 * m_CBR_its + 0.25 * ((currentCBR + m_previous_cbr) / 2);
-          }
-        else
-          {
-            m_CBR_its = (currentCBR + m_previous_cbr) / 2;
-          }
-        // Step 2
-        double factor1 = m_beta * (m_CBR_target - m_CBR_its);
-        if ((m_CBR_target - m_CBR_its) > 0)
-          {
-            delta_offset = factor1 < m_Gmax ? factor1 : m_Gmax;
-          }
-        else
-          {
-            delta_offset = factor1 > m_Gmin ? factor1 : m_Gmin;
-          }
+    {
+      m_CBR_its = (currentCBR + m_previous_cbr) / 2;
+    }
+  // Step 2
+  double factor1 = m_beta * (m_CBR_target - m_CBR_its);
+  if ((m_CBR_target - m_CBR_its) > 0)
+    {
+      delta_offset = factor1 < m_Gmax ? factor1 : m_Gmax;
+    }
+  else
+    {
+      delta_offset = factor1 > m_Gmin ? factor1 : m_Gmin;
+    }
 
-        // Step 3
-        m_delta = (1 - m_alpha) * m_delta + delta_offset;
+  // Step 3
+  m_delta = (1 - m_alpha) * m_delta + delta_offset;
 
-        // Step 4
-        if (m_delta > m_delta_max)
-          {
-            m_delta = m_delta_max;
-          }
+  // Step 4
+  if (m_delta > m_delta_max)
+    {
+      m_delta = m_delta_max;
+    }
 
-        // Step 5
-        if (m_delta < m_delta_min)
-          {
-            m_delta = m_delta_min;
-          }
+  // Step 5
+  if (m_delta < m_delta_min)
+    {
+      m_delta = m_delta_min;
+    }
 
-        if (m_caService != nullptr)
-          {
-            m_caService->toffUpdateAfterDeltaUpdate (m_delta);
-          }
-        if (m_caServiceV1 != nullptr)
-          {
-            m_caServiceV1->toffUpdateAfterDeltaUpdate (m_delta);
-          }
-        if (m_cpService != nullptr)
-          {
-            m_cpService->toffUpdateAfterDeltaUpdate(m_delta);
-          }
-        if (m_cpServiceV1 != nullptr)
-          {
-            m_cpServiceV1->toffUpdateAfterDeltaUpdate(m_delta);
-          }
-        if (m_vruService != nullptr)
-          {
-            m_vruService->toffUpdateAfterDeltaUpdate(m_delta);
-          }
-      }
-    m_time_to_do_steps = false;
-  }
-
+  if (m_caService != nullptr)
+    {
+      m_caService->toffUpdateAfterDeltaUpdate (m_delta);
+    }
+  if (m_caServiceV1 != nullptr)
+    {
+      m_caServiceV1->toffUpdateAfterDeltaUpdate (m_delta);
+    }
+  if (m_cpService != nullptr)
+    {
+      m_cpService->toffUpdateAfterDeltaUpdate(m_delta);
+    }
+  if (m_cpServiceV1 != nullptr)
+    {
+      m_cpServiceV1->toffUpdateAfterDeltaUpdate(m_delta);
+    }
+  if (m_vruService != nullptr)
+    {
+      m_vruService->toffUpdateAfterDeltaUpdate(m_delta);
+    }
   Simulator::Schedule(MilliSeconds(m_dcc_interval), &DCC::adaptiveDCC, this);
 }
 

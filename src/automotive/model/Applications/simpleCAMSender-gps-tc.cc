@@ -152,7 +152,7 @@ namespace ns3
     /* Set sockets, callback, station properties and TraCI VDP in CABasicService */
     m_caService.setSocketTx (m_socket);
     m_caService.setSocketRx (m_socket);
-    m_caService.addCARxCallback (std::bind(&simpleCAMSender::receiveCAM,this,std::placeholders::_1,std::placeholders::_2));
+    m_caService.addCARxCallbackExtended (std::bind(&simpleCAMSender::receiveCAM,this,std::placeholders::_1,std::placeholders::_2, std::placeholders::_3,std::placeholders::_4, std::placeholders::_5));
     m_caService.setRealTime (m_real_time);
 
     VDP* gpstc_vdp = new VDPGPSTraceClient(m_gps_tc_client,m_id);
@@ -198,7 +198,7 @@ namespace ns3
   }
 
   void
-  simpleCAMSender::receiveCAM (asn1cpp::Seq<CAM> cam, Address from)
+  simpleCAMSender::receiveCAM (asn1cpp::Seq<CAM> cam, Address from, StationID_t my_stationID, StationType_t my_StationType, SignalInfo phy_info)
   {
     /* Implement CAM strategy here */
     /*
@@ -207,7 +207,13 @@ namespace ns3
             <<" | Remote vehicle position: ("<<asn1cpp::getField(cam->cam.camParameters.basicContainer.referencePosition.latitude,double)/DOT_ONE_MICRO<<","
             <<asn1cpp::getField(cam->cam.camParameters.basicContainer.referencePosition.longitude,double)/DOT_ONE_MICRO<<")"<<std::endl;
     */
-
+    /* Write on a CSV file the time, sender, receiver, rx power*/
+    Time now = Simulator::Now ();
+    double time = now.GetSeconds ();
+    std::ofstream logFile;
+    logFile.open("cam-reception-log.csv", std::ios_base::app);
+    logFile << "Time: " << time << ", Sender: " << cam->header.stationId << ", Receiver: " << m_id << ", RSSI: " << phy_info.rssi << std::endl;
+    logFile.close();
   }
 
   void

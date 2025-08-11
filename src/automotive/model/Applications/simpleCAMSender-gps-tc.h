@@ -30,7 +30,7 @@ public:
   virtual ~simpleCAMSender ();
 
   // void receiveCAM(CAM_t *cam, Address address);
-  void receiveCAM(asn1cpp::Seq<CAM> cam, Address address);
+  void receiveCAM (asn1cpp::Seq<CAM> cam, Address from, StationID_t my_stationID, StationType_t my_StationType, SignalInfo phy_info);
 
   void receiveDENM(denData denm, Address from);
 

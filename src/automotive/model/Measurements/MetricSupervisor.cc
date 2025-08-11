@@ -174,6 +174,7 @@ MetricSupervisor::signalSentPacket(std::string buf, double lat, double lon, uint
     }
   else
     {
+      // TODO handle the PRR for gps-tc module
       if (!m_v_gpstc.empty()) return;
       NS_FATAL_ERROR("Fatal error: mobility client not set in PRR Supervisor.");
     }
@@ -207,6 +208,7 @@ MetricSupervisor::signalReceivedPacket(std::string buf, uint64_t nodeID)
 
   if(m_traci_ptr == nullptr && m_carla_ptr == nullptr)
     {
+      // TODO handle the PRR for gps-tc module
       if (!m_v_gpstc.empty()) return;
       NS_FATAL_ERROR("Fatal error: mobility client not set in PRR Supervisor.");
     }

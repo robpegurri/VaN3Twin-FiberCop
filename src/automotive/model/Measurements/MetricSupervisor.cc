@@ -441,7 +441,7 @@ MetricSupervisor::computePRR(std::string buf)
 }
 
 bool IsChannelBusy(WifiPhyState state) {
-  return state == WifiPhyState::TX || state == WifiPhyState::RX || state == WifiPhyState::CCA_BUSY;
+  return state != WifiPhyState::SLEEP && state != WifiPhyState::IDLE;
 }
 
 void

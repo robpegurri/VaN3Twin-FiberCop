@@ -124,7 +124,7 @@ int main (int argc, char *argv[])
   double m_baseline_prr = 150.0; // PRR baseline value (default: 150 m)
   int txPower = 33.0; // IEEE 802.11p transmission power in dBm
   xmlDocPtr rou_xml_file;
-  double simTime = 20.0; // Total simulation time (default: 100 seconds)
+  double simTime = 200.0; // Total simulation time (default: 100 seconds)
 
   // Set here the path to the SUMO XML files
   std::string sumo_folder = "src/automotive/examples/sumo_files_v2v_map_congestion/";
@@ -234,7 +234,7 @@ int main (int argc, char *argv[])
   metSup->setChannelTechnology("80211p");
   metSup->enableCBRVerboseOnStdout();
   metSup->enableCBRWriteToFile();
-  metSup->setCBRWindowValue(200);
+  metSup->setCBRWindowValue(100);
   metSup->setCBRAlphaValue(0.1);
   metSup->setSimulationTimeValue(simTime);
   metSup->setNodeContainer(c);
@@ -294,7 +294,8 @@ int main (int argc, char *argv[])
       Simulator::ScheduleWithContext (id,
                                       Seconds (1.0), &GenerateTraffic_interfering,
                                       source_interfering[nodeID], 1000, simTime*2000, MilliSeconds (5));
-      */
+                                      */
+
       // Create a new ETSI GeoNetworking socket, thanks to the GeoNet::createGNPacketSocket() function, accepting as argument a pointer to the current node
       Ptr<Socket> sock;
       sock=GeoNet::createGNPacketSocket(c.Get(nodeID));

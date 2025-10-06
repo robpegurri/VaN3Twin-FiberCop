@@ -784,7 +784,7 @@ namespace ns3
 
           for(size_t i=1;i<m_refPositions.size ();i++)
             {
-              auto curr_ph = asn1cpp::makeSeq(PathPoint);
+              curr_ph = asn1cpp::makeSeq(PathPoint);
 
               asn1cpp::setField(curr_ph->pathPosition.deltaAltitude,m_refPositions[i].first.altitude.altitudeValue - m_refPositions[i-1].first.altitude.altitudeValue);
               asn1cpp::setField(curr_ph->pathPosition.deltaLatitude,m_refPositions[i].first.latitude - m_refPositions[i-1].first.latitude);
@@ -995,17 +995,16 @@ namespace ns3
     dataRequest.GNTraClass = 0x02; // Store carry foward: no - Channel offload: no - Traffic Class ID: 2
     dataRequest.lenght = packet->GetSize ();
     dataRequest.data = packet;
-    m_btp->sendBTP(dataRequest);
-
-    m_cam_sent++;
+    std::tuple<GNDataConfirm_t, MessageId_t> status = m_btp->sendBTP(dataRequest, 0, MessageId_cam);
+    GNDataConfirm_t dataConfirm = std::get<0>(status);
+    MessageId_t message_id = std::get<1>(status);
+    /* Update the CAM statistics */
+    if(dataConfirm == ACCEPTED) {
+        if (message_id == MessageId_cam) m_cam_sent++;
+      }
 
     // Estimation of the transmission time
     m_last_transmission = (double) Simulator::Now().GetMilliSeconds();
-    uint32_t packetSize = packet->GetSize();
-    m_Ton_pp = (double) (NanoSeconds((packetSize * 8) / 0.006) + MicroSeconds(68)).GetNanoSeconds();
-    m_Ton_pp = m_Ton_pp / 1e6;
-
-    toffUpdateAfterTransmission();
 
     // Store the time in which the last CAM (i.e. this one) has been generated and successfully sent
     now=computeTimestampUInt64 ()/NANO_TO_MILLI;
@@ -1091,30 +1090,4 @@ namespace ns3
     return int_tstamp;
   }
 
-  void
-  CABasicService::toffUpdateAfterDeltaUpdate(double delta)
-  {
-    if (m_last_transmission == 0)
-      return;
-    double waiting = Simulator::Now().GetMilliSeconds() - m_last_transmission;
-    double aux = m_Ton_pp / delta * (m_T_CheckCamGen_ms - waiting) / m_T_CheckCamGen_ms + waiting;
-    aux = std::max (aux, 25.0);
-    double new_gen_time = std::min (aux, 1000.0);
-    setNextCAMDCC ((long) new_gen_time);
-    m_last_delta = delta;
-  }
-
-  void
-  CABasicService::toffUpdateAfterTransmission()
-  {
-    if (m_use_adaptive_dcc)
-    {
-      if (m_last_delta == 0)
-        return;
-      double aux = m_Ton_pp / m_last_delta;
-      double new_gen_time = std::max(aux, 25.0);
-      new_gen_time = std::min(new_gen_time, 1000.0);
-      setNextCAMDCC ((long) new_gen_time);
-    }
-  }
 }

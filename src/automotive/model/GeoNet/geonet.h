@@ -24,6 +24,7 @@
 #include "ns3/longpositionvector.h"
 #include "ns3/btpdatarequest.h"
 #include "ns3/VRUdp.h"
+#include "ns3/DCC.h"
 
 extern "C" {
   #include "ns3/CAM.h"
@@ -117,13 +118,15 @@ namespace ns3
        * @brief Set the callback function to receive packets.
        * @param rx_callback
        */
+
+      void setDCC(Ptr<DCC> dcc) {m_dcc = dcc;}
       void addRxCallback(std::function<void(GNDataIndication_t,Address)> rx_callback) {m_ReceiveCallback=rx_callback;}
       /**
        * @brief Create GeoNet PDU with the correct headers (GBC or TSB) and send it.
        * @param dataRequest
        * @return
        */
-      GNDataConfirm_t sendGN(GNDataRequest_t dataRequest);
+      std::tuple<GNDataConfirm_t, MessageId_t> sendGN (GNDataRequest_t dataRequest, int priority, MessageId_t message_id);
       /**
        * @brief Receive a GeoNet PDU and send a data indication to BTP layer.
        * @param socket
@@ -146,6 +149,8 @@ namespace ns3
       // This static method creates a new GeoNetworking socket, starting from the ns-3 PacketSocket and properly binding/connecting it
       // It requires as input a pointer to the node to which the socket should be bound
       static Ptr<Socket> createGNPacketSocket(Ptr<Node> node_ptr);
+
+      void attachDCC();
 
   private:
       void LocTE_timeout(GNAddress entry_address);
@@ -239,6 +244,7 @@ namespace ns3
       bool m_PRRsupervisor_beacons = true;
 
       bool m_EPVupdate_running = true;
+      Ptr<DCC> m_dcc = nullptr;
 
   };
 }

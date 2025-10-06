@@ -193,24 +193,6 @@ namespace ns3
     void setProtectedCommunicationsZonesRSU(asn1cpp::Seq<RSUContainerHighFrequency> sequence) {m_protectedCommunicationsZonesRSU = sequence;}
 
     /**
-     * @brief Set the future time to send a CAM
-     * @param nextCAM The next time to send CAM
-     */
-    void setNextCAMDCC(long nextCAM) {m_T_next_dcc = nextCAM;};
-
-    /**
-     * @brief Used for DCC Adaptive approach to set the future time to check CAM condition after an update of delta value
-     * @param delta new delta value calculated through DCC adaptive approach
-     */
-    void toffUpdateAfterDeltaUpdate(double delta);
-
-    /**
-     * @brief Used for DCC Adaptive approach to set the future time to check CAM condition after a transmission
-     * @param delta new delta value calculated through DCC adaptive approach
-     */
-    void toffUpdateAfterTransmission();
-
-    /**
      * @brief Stop the CAM dissemination
      *
      * This function stops the CAM dissemination process.
@@ -224,9 +206,6 @@ namespace ns3
 
     void write_log_triggering(bool condition_verified, float head_diff, float pos_diff, float speed_diff, long time_difference, std::string data_head, std::string data_pos, std::string data_speed, std::string data_time, std::string data_dcc);
 
-    double getTon() {return m_Ton_pp;};
-
-    void setAdaptiveDCC() {m_use_adaptive_dcc = true;};
 
   private:
     const size_t m_MaxPHLength = 23;
@@ -325,8 +304,6 @@ namespace ns3
     bool m_specialVehContainerEnabled;
 
     double m_last_transmission = 0;
-    double m_Ton_pp = 0;
-    double m_last_delta = 0;
 
     bool m_log_triggering = false;
     std::string m_log_filename;
@@ -338,7 +315,6 @@ namespace ns3
     uint64_t m_time_sent = 0;
 
     long m_T_next_dcc = -1;
-    bool m_use_adaptive_dcc = false;
   };
 }
 

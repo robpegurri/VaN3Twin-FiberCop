@@ -569,7 +569,9 @@ namespace ns3 {
     /* We are basically adding the current entry, containing the already UPER encoded DENM packet, to a map of <ActionID,ITSSOriginatingTableEntry> */
     ITSSOriginatingTableEntry entry(*packet, ITSSOriginatingTableEntry::STATE_ACTIVE,actionid);
 
-    m_btp->sendBTP(dataRequest);
+    std::tuple<GNDataConfirm_t, MessageId_t> status = m_btp->sendBTP(dataRequest, 0, MessageId_denm);
+    GNDataConfirm_t dataConfirm = std::get<0>(status);
+    MessageId_t message_id = std::get<1>(status);
 
     m_originatingTimerTable.emplace(map_index,std::tuple<Timer,Timer,Timer>());
 
@@ -670,7 +672,9 @@ namespace ns3 {
     dataRequest.lenght = packet->GetSize ();
     dataRequest.data = packet;
 
-    m_btp->sendBTP(dataRequest);
+    std::tuple<GNDataConfirm_t, MessageId_t> status = m_btp->sendBTP(dataRequest, 0, MessageId_denm);
+    GNDataConfirm_t dataConfirm = std::get<0>(status);
+    MessageId_t message_id = std::get<1>(status);
 
     /* 9. Update the entry in the originating ITS-S message table. */
     entry_map_it->second.setDENMPacket(*packet);
@@ -835,7 +839,9 @@ namespace ns3 {
     dataRequest.GNTraClass = 0x01; // Store carry foward: no - Channel offload: no - Traffic Class ID: 1
     dataRequest.lenght = packet->GetSize ();
     dataRequest.data = packet;
-    m_btp->sendBTP(dataRequest);
+    std::tuple<GNDataConfirm_t, MessageId_t> status = m_btp->sendBTP(dataRequest, 0, MessageId_denm);
+    GNDataConfirm_t dataConfirm = std::get<0>(status);
+    MessageId_t message_id = std::get<1>(status);
 
     /* 6a. If termination is set to 1, create an entry in the originating ITS-S message table and set the state to NEGATED. */
     if(termination==1)
@@ -1122,7 +1128,9 @@ namespace ns3 {
     dataRequest.GNTraClass = 0x01; // Store carry foward: no - Channel offload: no - Traffic Class ID: 1
     dataRequest.lenght = packet->GetSize ();
     dataRequest.data = packet;
-    m_btp->sendBTP(dataRequest);
+    std::tuple<GNDataConfirm_t, MessageId_t> status = m_btp->sendBTP(dataRequest, 0, MessageId_denm);
+    GNDataConfirm_t dataConfirm = std::get<0>(status);
+    MessageId_t message_id = std::get<1>(status);
 
     // Restart timer
     std::get<T_REPETITION_INDEX>(m_originatingTimerTable[map_index]).Schedule();

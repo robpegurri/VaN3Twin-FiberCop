@@ -139,7 +139,6 @@ namespace ns3
         m_LDM->setStationID (m_sumo_vehid_prefix + std::to_string (m_station_id));
     }
 
-
     // Setup the required services
     // ETSI Transport and Networking layers
     m_btp = CreateObject <btp>();

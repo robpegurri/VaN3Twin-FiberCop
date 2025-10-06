@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <tuple>
 #include "ns3/MetricSupervisor.h"
 #include "ns3/wifi-net-device.h"
 //#include "ns3/nr-net-device.h"
@@ -10,8 +11,14 @@
 #include "ns3/wifi-phy.h"
 //#include "ns3/nr-ue-phy.h"
 #include "ns3/traci-client.h"
-#include "ns3/BSMap.h"
-//#include "ns3/nr-module.h"
+#include "ns3/basic-header.h"
+#include "ns3/common-header.h"
+#include "ns3/longpositionvector.h"
+#include "ns3/btpdatarequest.h"
+#include "ns3/MessageId.h"
+// #include "ns3/BSMap.h"
+// #include "ns3/nr-module.h"
+// #include "ns3/geonet.h"
 
 namespace ns3 {
 
@@ -23,9 +30,51 @@ namespace ns3 {
  * This class provides capabilities for computing both the Reactive DCC and the Proactive DCC.
  */
 
+typedef struct QueuePacket {
+  int time;
+  GNBasicHeader bh;
+  GNCommonHeader ch;
+  GNlpv_t long_PV;
+  GNDataRequest_t dataRequest;
+  MessageId_t message_id;
+} QueuePacket;
+
 class DCC : public Object
 {
 public:
+
+  static TypeId GetTypeId(void);
+  /**
+   * \brief Default constructor
+   *
+   */
+  DCC ();
+  ~DCC();
+
+  /**
+    * \brief Setup DCC
+    */
+  void SetupDCC(std::string item_id, Ptr<MetricSupervisor> met_sup, Ptr<Node> node, std::string modality, uint32_t dcc_interval, float cbr_target=0.63, int queue_length=0, int max_lifetime=100, std::string log_file="");
+
+  void StartDCC();
+
+  void setMetricSupervisor(MetricSupervisor *met_sup_ptr) {m_metric_supervisor = met_sup_ptr;}
+  void setLastTx(float t) {m_last_tx = t;}
+  void cleanQueues(int now);
+  void enqueue(int priority, QueuePacket p);
+  std::tuple<bool, QueuePacket> dequeue(int priority);
+
+  float getTonpp();
+  void updateTgoAfterStateCheck(uint32_t Toff);
+  void updateTonpp(ssize_t pktSize);
+  bool checkGateOpen(int64_t now);
+  void updateTgoAfterDeltaUpdate();
+  void updateTgoAfterTransmission();
+  std::string getModality() {return m_modality;}
+  void setBitRate(long bitrate) {m_bitrate_bps = bitrate;}
+  void setSendCallback(std::function<void(const QueuePacket&)> cb);
+
+private:
 
   typedef enum ReactiveState
   {
@@ -44,82 +93,24 @@ public:
     double sensitivity;
   } ReactiveParameters;
 
-  static TypeId GetTypeId(void);
-  /**
-   * \brief Default constructor
-   *
-   */
-  DCC ();
-  ~DCC();
+  const std::unordered_map<ReactiveState, ReactiveParameters> m_reactive_parameters_Ton_500_us =
+      {
+          {Relaxed,     {0.3, 30.0, -1, 50, -95.0}},
+          {Active1,     {0.4, 30.0, -1, 100,  -95.0}},
+          {Active2,     {0.5, 30.0, -1, 200, -95.0}},
+          {Active3,     {0.65, 12.0, -1, 250, -95.0}},
+          {Restrictive, {1.0, 6.0, -1, 1000, -65.0}}
+      };
 
-  const std::unordered_map<ReactiveState, ReactiveParameters> m_reactive_parameters_Ton_1ms = 
-  {
-    // Values represent: CBR threshold, Tx Power [dBm], Data Rate [Mbit/s], Tx Inter Packet Time [ms], Rx Sensitivity [dBm]
-    {Relaxed,     {0.3, 30.0, -1, 100, -95.0}},
-    {Active1,     {0.4, 24.0, -1, 200,  -95.0}},
-    {Active2,     {0.5, 18.0, -1, 400, -95.0}},
-    {Active3,     {0.6, 12.0, -1, 500, -95.0}},
-    {Restrictive, {1.0, 6.0, -1, 1000, -65.0}}
-  };
-
-  const std::unordered_map<ReactiveState, ReactiveParameters> m_reactive_parameters_Ton_500_us = 
-  {
-    {Relaxed,     {0.3, 30.0, -1, 50, -95.0}},
-    {Active1,     {0.4, 24.0, -1, 100,  -95.0}},
-    {Active2,     {0.5, 18.0, -1, 200, -95.0}},
-    {Active3,     {0.65, 12.0, -1, 250, -95.0}},
-    {Restrictive, {1.0, 6.0, -1, 1000, -65.0}}
-  };
-
-  /**
-    * \brief Setup DCC
-    *
-    * \param item_id item id
-    * \param node node object
-    * \param modality modality of DCC, can be "reactive" or "adaptive"
-    * \param dcc_interval time interval DCC
-    * \param traci_client pointer to MetricSupervisor 
-    */
-  void SetupDCC(std::string item_id, Ptr<Node> node, std::string modality, uint32_t dcc_interval, Ptr<MetricSupervisor> traci_client); 
- /**
-    * \brief Set the CAM Basic Service
-    *
-    * \param nodeID id of the node
-    * \param caBasicService basic service for CAMs
-    */
-  void AddCABasicService(Ptr<CABasicService> caBasicService) {m_caService = caBasicService;};
-  /**
-    * \brief Set the CAM Basic Service (Version 1)
-    *
-    * \param nodeID id of the node
-    * \param caBasicService basic service for CAMs
-    */
-  void AddCABasicServiceV1(Ptr<CABasicServiceV1> caBasicService) {m_caServiceV1 = caBasicService;};
-  /**
-    * \brief Set the CPM Basic Service
-    *
-    * \param nodeID id of the node
-    * \param cpBasicService basic service for CPMs
-    */
-  void AddCPBasicService(Ptr<CPBasicService> cpBasicService) {m_cpService = cpBasicService;};
-  /**
-    * \brief Set the CPM Basic Service (Version 1)
-    *
-    * \param nodeID id of the node
-    * \param cpBasicService basic service for CPMs
-    */
-  void AddCPBasicService(Ptr<CPBasicServiceV1> cpBasicService) {m_cpServiceV1 = cpBasicService;};
-  /**
-    * \brief Set the VRU Basic Service
-    *
-    * \param nodeID id of the node
-    * \param vruBasicService basic service for VRUs
-    */
-  void AddVRUBasicService(std::string nodeID, Ptr<VRUBasicService> vruBasicService) {m_vruService = vruBasicService;};
-
-  void StartDCC();
-
-private:
+  const std::unordered_map<ReactiveState, ReactiveParameters> m_reactive_parameters_Ton_1ms =
+      {
+          // Values represent: CBR threshold, Tx Power [dBm], Data Rate [Mbit/s], Tx Inter Packet Time [ms], Rx Sensitivity [dBm]
+          {Relaxed,     {0.3, 30.0, -1, 100, -95.0}},
+          {Active1,     {0.4, 30.0, -1, 200,  -95.0}},
+          {Active2,     {0.5, 18.0, -1, 400, -95.0}},
+          {Active3,     {0.6, 12.0, -1, 500, -95.0}},
+          {Restrictive, {1.0, 6.0, -1, 1000, -65.0}}
+      };
 
   /**
    * \brief Start the reactive DCC mechanism
@@ -137,19 +128,15 @@ private:
    */
   void adaptiveDCCcheckCBR();
 
+  void checkQueue();
+
   std::unordered_map<ReactiveState, ReactiveParameters> getConfiguration(double Ton, double currentCBR);
 
   std::string m_item_id;
   Ptr<Node> m_node;
-
   std::string m_modality = ""; //!< Boolean to indicate if the DCC is reactive or adaptive
   uint32_t m_dcc_interval = -1; //!< Time interval for DCC
   Ptr<MetricSupervisor> m_metric_supervisor = NULL; //!< Pointer to the MetricSupervisor object
-  Ptr<CABasicService> m_caService; //!< Pointer to the CABasicService object
-  Ptr<CABasicServiceV1> m_caServiceV1; //!< Pointer to the CABasicService object
-  Ptr<CPBasicService> m_cpService; //!< Pointer to the CPBasicService object
-  Ptr<CPBasicServiceV1> m_cpServiceV1; //!< Pointer to the CPBasicService object
-  Ptr<VRUBasicService> m_vruService; //!< Pointer to the VRUBasicService object
   ReactiveState m_current_state = ReactiveState::Relaxed;
 
   double m_CBR_its = -1;
@@ -162,7 +149,28 @@ private:
   double m_Gmin = -0.00025;
   uint32_t m_T_CBR = 100; // Check the CBR value each 100 ms for Adaptive DCC from standard suggestion
   double m_delta = 0;
-  double m_previous_cbr;
+  double m_previous_cbr = -1;
+
+  float m_Tpg_ms = 0.0;
+  float m_Tgo_ms = 0.0;
+  float m_Ton_pp = 0.5;
+  float m_Toff_ms = 0.0;
+  float m_last_tx = 0.0;
+  long m_bitrate_bps = 3;
+  std::string m_dcc = "";
+  float m_cbr = 0.0;
+  uint8_t m_queue_length = 0;
+  long m_lifetime{}; // ms
+  struct GNDataIndication_t; // forward declaration to avoid circular import with geonet.h
+
+  std::vector<QueuePacket> m_dcc_queue_dp0;
+  std::vector<QueuePacket> m_dcc_queue_dp1;
+  std::vector<QueuePacket> m_dcc_queue_dp2;
+  std::vector<QueuePacket> m_dcc_queue_dp3;
+
+  uint32_t m_dropped_by_gate = 0;
+  std::string m_log_file = "";
+  std::function<void(const QueuePacket&)> m_send_callback;
 
 };
 

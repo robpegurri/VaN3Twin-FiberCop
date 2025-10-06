@@ -613,10 +613,10 @@ namespace ns3 {
     dataRequest.GNTraClass = 0x01; // Store carry foward: no - Channel offload: no - Traffic Class ID: 1
     dataRequest.lenght = packet->GetSize ();
     dataRequest.data = packet;
-    m_btp->sendBTP(dataRequest);
-
-
-       return IVIM_NO_ERROR;
+    std::tuple<GNDataConfirm_t, MessageId_t> status = m_btp->sendBTP(dataRequest, 0, MessageId_ivim);
+    GNDataConfirm_t dataConfirm = std::get<0>(status);
+    MessageId_t message_id = std::get<1>(status);
+    return IVIM_NO_ERROR;
   }
 
 
@@ -668,10 +668,10 @@ namespace ns3 {
       dataRequest.GNTraClass = 0x01; // Store carry foward: no - Channel offload: no - Traffic Class ID: 1
       dataRequest.lenght = packet->GetSize ();
       dataRequest.data = packet;
-      m_btp->sendBTP(dataRequest);
-
-
-         return IVIM_NO_ERROR;
+      std::tuple<GNDataConfirm_t, MessageId_t> status = m_btp->sendBTP(dataRequest, 0, MessageId_ivim);
+      GNDataConfirm_t dataConfirm = std::get<0>(status);
+      MessageId_t message_id = std::get<1>(status);
+      return IVIM_NO_ERROR;
   }
 
   IVIBasicService_error_t
@@ -719,10 +719,10 @@ namespace ns3 {
       dataRequest.GNTraClass = 0x01; // Store carry foward: no - Channel offload: no - Traffic Class ID: 1
       dataRequest.lenght = packet->GetSize ();
       dataRequest.data = packet;
-      m_btp->sendBTP(dataRequest);
-
-
-  return IVIM_NO_ERROR;
+      std::tuple<GNDataConfirm_t, MessageId_t> status = m_btp->sendBTP(dataRequest, 0, MessageId_ivim);
+      GNDataConfirm_t dataConfirm = std::get<0>(status);
+      MessageId_t message_id = std::get<1>(status);
+      return IVIM_NO_ERROR;
   }
 
   IVIBasicService_error_t
@@ -777,11 +777,10 @@ namespace ns3 {
       dataRequest.GNTraClass = 0x01; // Store carry foward: no - Channel offload: no - Traffic Class ID: 1
       dataRequest.lenght = packet->GetSize ();
       dataRequest.data = packet;
-      m_btp->sendBTP(dataRequest);
-
-
-
-  return IVIM_NO_ERROR;
+      std::tuple<GNDataConfirm_t, MessageId_t> status = m_btp->sendBTP(dataRequest, 0, MessageId_ivim);
+      GNDataConfirm_t dataConfirm = std::get<0>(status);
+      MessageId_t message_id = std::get<1>(status);
+      return IVIM_NO_ERROR;
   }
 
   iviData::IVI_glcP_PolygonalLine_t

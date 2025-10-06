@@ -87,24 +87,6 @@ public:
     const long T_GenVamMin_ms = 100;
     const long T_GenVamMax_ms = 5000;
 
-    /**
-     * @brief Set the future time to send a VAM
-     * @param nextVAM The next time to send VAM
-     */
-    void setNextVAMDCC(long nextVAM) {m_T_next_dcc = nextVAM;};
-
-    /**
-     * @brief Used for DCC Adaptive approach to set the future time to check VAM condition after an update of delta value
-     * @param delta new delta value calculated through DCC adaptive approach
-     */
-    void toffUpdateAfterDeltaUpdate(double delta);
-
-    /**
-     * @brief Used for DCC Adaptive approach to set the future time to check VAM condition after a transmission
-     * @param delta new delta value calculated through DCC adaptive approach
-     */
-    void toffUpdateAfterTransmission();
-
     void SetLogTriggering(bool log, std::string log_filename) {m_log_triggering = log; m_log_filename = log_filename;};
 
     void write_log_triggering(bool condition_verified, bool vamredmit_verified, float head_diff, float pos_diff, float speed_diff, long time_difference, std::string data_head, std::string data_pos, std::string data_speed, std::string data_safed, std::string data_time, std::string data_vamredmit, std::string data_dcc);
@@ -113,9 +95,6 @@ public:
       return ((minDist>-DBL_MAX && minDist<MAXFLOAT) ? std::to_string(minDist) : "unavailable");
     }
 
-    double getTon() {return m_Ton_pp;};
-
-    void setAdaptiveDCC() {m_use_adaptive_dcc = true;};
 
 private:
     void initDissemination();
@@ -195,8 +174,6 @@ private:
     bool m_lowFreqContainerEnabled;
 
     double m_last_transmission = 0;
-    double m_Ton_pp = 0;
-    double m_last_delta = 0;
 
     bool m_log_triggering = false;
     std::string m_log_filename;
@@ -208,7 +185,6 @@ private:
     uint64_t m_safedist_sent = 0;
     uint64_t m_time_sent = 0;
 
-    bool m_use_adaptive_dcc = false;
     long m_T_next_dcc = -1;
 };
 

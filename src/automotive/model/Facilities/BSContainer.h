@@ -75,6 +75,9 @@ namespace ns3
     // This function should be called to automatically perform all the necessary cleanup operations (like stopping the CAM
     // dissemation, if enabled, and the GeoNetworking egoPV updates)
     void cleanup();
+
+    Ptr<GeoNet> getGeoNet() {return m_gn;};
+
   private:
     // Message reception callbacks
     std::function<void(asn1cpp::Seq<CAM>, Address, StationID_t, StationType_t, SignalInfo)> m_CAReceiveCallbackExtended;

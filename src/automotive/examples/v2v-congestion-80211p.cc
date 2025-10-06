@@ -290,9 +290,11 @@ int main (int argc, char *argv[])
     {
       unsigned long nodeID = std::stol(vehicleID.substr (3))-1;
       uint32_t id = source_interfering[nodeID]->GetNode()->GetId();
+      /*
       Simulator::ScheduleWithContext (id,
                                       Seconds (1.0), &GenerateTraffic_interfering,
                                       source_interfering[nodeID], 1000, simTime*2000, MilliSeconds (5));
+      */
       // Create a new ETSI GeoNetworking socket, thanks to the GeoNet::createGNPacketSocket() function, accepting as argument a pointer to the current node
       Ptr<Socket> sock;
       sock=GeoNet::createGNPacketSocket(c.Get(nodeID));
@@ -317,15 +319,18 @@ int main (int argc, char *argv[])
       // The third parameter should be true if you want to setup a VRU Basic Service (for sending/receiving VAMs)
 
       bs_container->addCPMRxCallback (std::bind(&receiveCPM,std::placeholders::_1,std::placeholders::_2,std::placeholders::_3,std::placeholders::_4,std::placeholders::_5));
-      bs_container->setupContainer(true,false,false, true);
+      bs_container->setupContainer(true,false,false,true);
+      Ptr<GeoNet> gn = bs_container->getGeoNet();
 
       // Store the container for this vehicle inside a local global BSMap, i.e., a structure (similar to a hash table) which allows you to easily
       // retrieve the right BSContainer given a vehicle ID
       basicServices.add(bs_container);
 
-      // Setup DCC
-      dcc_per_node[c.Get(nodeID)]->SetupDCC(vehicleID, c.Get(nodeID), "reactive", 200, metSup);
-      dcc_per_node[c.Get(nodeID)]->AddCABasicService(bs_container->getCABasicService());
+      // Setup DCC for both internal behavior and GeoNet link
+      dcc_per_node[c.Get(nodeID)]->SetupDCC(vehicleID, metSup, c.Get(nodeID), "reactive", 200);
+      dcc_per_node[c.Get(nodeID)]->setBitRate (6);
+      gn->setDCC (dcc_per_node[c.Get(nodeID)]);
+      gn->attachDCC();
       dcc_per_node[c.Get(nodeID)]->StartDCC();
 
       // Start transmitting CAMs

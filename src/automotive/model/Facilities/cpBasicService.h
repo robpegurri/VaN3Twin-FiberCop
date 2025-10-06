@@ -121,32 +121,10 @@ public:
   void setRedundancyMitigation(bool choice){m_redundancy_mitigation = choice;}
   void disableRedundancyMitigation(){m_redundancy_mitigation = false;}
 
-  /**
-     * @brief Set the future time to send a CPM
-     * @param nextCPM The next time to send CPM
-     */
-    void setNextCPMDCC(long nextCPM) {m_T_next_dcc = nextCPM;};
-
   const long T_GenCpmMin_ms = 100;
   const long T_GenCpm_ms = 100;
   const long T_GenCpmMax_ms = 1000;
   const long m_T_AddSensorInformation = 1000;
-
-  /**
-     * @brief Used for DCC Adaptive approach to set the future time to check CPM condition after an update of delta value
-     * @param delta new delta value calculated through DCC adaptive approach
-     */
-  void toffUpdateAfterDeltaUpdate(double delta);
-
-  /**
-     * @brief Used for DCC Adaptive approach to set the future time to check CPM condition after a transmission
-     * @param delta new delta value calculated through DCC adaptive approach
-     */
-  void toffUpdateAfterTransmission();
-
-  double getTon() {return m_Ton_pp;};
-
-  void setAdaptiveDCC() {m_use_adaptive_dcc = true;};
 
 
 private:
@@ -212,11 +190,8 @@ private:
   EventId m_event_cpmSend;
 
   double m_last_transmission = 0;
-  double m_Ton_pp = 0;
-  double m_last_delta = 0;
 
   long m_T_next_dcc = -1;
-  bool m_use_adaptive_dcc = false;
 };
 }
 #endif // CPBASICSERVICE_H

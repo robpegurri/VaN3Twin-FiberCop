@@ -110,7 +110,7 @@ namespace ns3
      *
      * @param dataRequest The BTPDataRequest_t structure containing the BTP message to be sent.
      */
-    void sendBTP(BTPDataRequest_t dataRequest);
+    std::tuple<GNDataConfirm_t, MessageId_t> sendBTP(BTPDataRequest_t dataRequest, int priority, MessageId_t message_id);
     /**
      * @brief Receive a BTP message from GeoNet and pass it to the appropriate callback.
      *

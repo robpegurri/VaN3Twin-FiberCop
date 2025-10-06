@@ -168,8 +168,9 @@ namespace ns3
     if (m_enable_dcc)
       {
         m_dcc = CreateObject<DCC>();
-        m_dcc->SetupDCC (m_id, m_node, m_dcc_modality, m_dcc_time_window, m_met_sup);
-        m_dcc->AddCABasicService (&m_caService);
+        m_dcc->SetupDCC(m_id, m_met_sup, m_node, m_dcc_modality, m_dcc_time_window);
+        m_geoNet->setDCC (m_dcc);
+        m_geoNet->attachDCC();
         m_dcc->StartDCC();
       }
   }

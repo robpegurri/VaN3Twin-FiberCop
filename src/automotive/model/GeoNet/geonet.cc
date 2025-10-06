@@ -25,7 +25,13 @@
 #include "ns3/gn-utils.h"
 #include <cmath>
 #include "ns3/ipv4-header.h"
+#include "ns3/DCC.h"
 #define SN_MAX 65536
+
+#define IEEE80211_DATA_PKT_HDR_LEN 24
+#ifndef IEEE80211_FCS_LEN
+#define IEEE80211_FCS_LEN 4
+#endif
 
 namespace ns3 {
 
@@ -152,7 +158,7 @@ namespace ns3 {
     dataRequest.lenght = 0;
     Ptr<Packet> packet = Create<Packet>();
     dataRequest.data = packet;
-    sendGN (dataRequest);
+    sendGN (dataRequest, 0, -1);
   }
 
   void
@@ -234,14 +240,15 @@ namespace ns3 {
           break;
       default:
           NS_LOG_ERROR("GeoNet: UNABLE TO DECODE LIFETIME FIELD ");
+          seconds = 0;
           break;
     };
 
     return seconds;
   }
 
-  GNDataConfirm_t
-  GeoNet::sendGN (GNDataRequest_t dataRequest)
+  std::tuple<GNDataConfirm_t, MessageId_t>
+  GeoNet::sendGN (GNDataRequest_t dataRequest, int priority, MessageId_t message_id)
   {
     GNDataConfirm_t dataConfirm = ACCEPTED;
     GNBasicHeader basicHeader;
@@ -253,21 +260,13 @@ namespace ns3 {
       NS_FATAL_ERROR("Error: no position has been set for an RSU object. Please use setFixedPositionRSU() on the Facilities Layer object.");
     }
 
-    if(dataRequest.lenght > m_GnMaxSduSize)
-    {
-      return MAX_LENGHT_EXCEEDED;
-    }
-    if(dataRequest.GNMaxLife > m_GNMaxPacketLifetime)
-    {
-       return MAX_LIFE_EXCEEDED;
-    }
-    if(dataRequest.GNRepInt != 0)
-    {
-      if(dataRequest.GNRepInt < m_GNMinPacketRepetitionInterval)
-      {
-        return REP_INTERVAL_LOW;
+    if(dataRequest.lenght > m_GnMaxSduSize) {
+        return std::tuple<GNDataConfirm_t, MessageId_t>(MAX_LENGHT_EXCEEDED, message_id);
+      } else if(dataRequest.GNMaxLife > m_GNMaxPacketLifetime) {
+        return std::tuple<GNDataConfirm_t, MessageId_t>(MAX_LIFE_EXCEEDED, message_id);
+      } else if(dataRequest.GNRepInt != 0 && dataRequest.GNRepInt < m_GNMinPacketRepetitionInterval) {
+        return std::tuple<GNDataConfirm_t, MessageId_t>(REP_INTERVAL_LOW, message_id);
       }
-    }
 
     //Basic Header field setting according to ETSI EN 302 636-4-1 [10.3.2]
     basicHeader.SetVersion (m_GnPtotocolVersion);
@@ -327,6 +326,53 @@ namespace ns3 {
     longPV.speed = (int16_t) (m_egoPV.S_EPV*100); // [m/s] to [0.01 m/s]
     longPV.heading = (uint16_t) (m_egoPV.H_EPV*10);// [degrees] to [0.1 degrees]
 
+    auto now = static_cast<int>(Simulator::Now().GetMilliSeconds());
+    bool gate_open = false;
+    QueuePacket pkt = { now, basicHeader, commonHeader, longPV, dataRequest, message_id};
+    bool check_message_id = (message_id == MessageId_cam || message_id == MessageId_vam || message_id == MessageId_cpm);
+    if (m_dcc != nullptr && check_message_id)
+      {
+        gate_open = m_dcc->checkGateOpen(now);
+        if (gate_open == false)
+          {
+            // Gate is closed
+            m_dcc->enqueue(priority, pkt);
+            // std::cout << "[ENQUEUE]" << std::endl;
+            return std::tuple<GNDataConfirm_t, MessageId_t>(BLOCKED_BY_GK, message_id);
+          }
+        else
+          {
+            // Gate is opened
+            std::tuple<bool, QueuePacket> value = m_dcc->dequeue(priority);
+            if (std::get<0>(value) == true)
+              {
+                // Found a packet in queue with higher priority
+                m_dcc->enqueue(priority, pkt);
+                QueuePacket pkt_to_send = std::get<1>(value);
+                basicHeader = pkt_to_send.bh;
+                commonHeader = pkt_to_send.ch;
+                longPV = pkt_to_send.long_PV;
+                dataRequest = pkt_to_send.dataRequest;
+                message_id = pkt.message_id;
+                // std::cout << "[DEQUEUE]" << std::endl;
+              }
+            else
+              {
+                // std::cout << "[ORIGINAL]" << std::endl;
+              }
+            m_dcc->setLastTx(now);
+          }
+      }
+    else
+      {
+        // std::cout << "[ORIGINAL NO DCC]" << std::endl;
+      }
+
+    if (m_dcc != nullptr && m_dcc->getModality() == "adaptive")
+      {
+        m_dcc->updateTgoAfterTransmission();
+      }
+
     switch(dataRequest.GNType)
     {
     case BEACON:
@@ -342,7 +388,37 @@ namespace ns3 {
       NS_LOG_ERROR("GeoNet packet not supported");
       dataConfirm = UNSPECIFIED_ERROR;
     }
-    return dataConfirm;
+    return std::tuple<GNDataConfirm_t, MessageId_t>(dataConfirm, message_id);
+  }
+
+  void GeoNet::attachDCC()
+  {
+    if (m_dcc == nullptr) return;
+    m_dcc->setSendCallback([this](const QueuePacket& pkt){
+      GNBasicHeader bh = pkt.bh;
+      GNCommonHeader ch = pkt.ch;
+      GNlpv_t longPV = pkt.long_PV;
+      GNDataRequest_t dataRequest = pkt.dataRequest;
+      MessageId_t message_id = pkt.message_id;
+
+      GNDataConfirm_t dataConfirm;
+
+      auto now = Simulator::Now().GetMilliSeconds();
+      m_dcc->setLastTx(now);
+
+      // set last tx etc. is handled by DCC; here we just call the appropriate send
+      switch(dataRequest.GNType)
+        {
+        case GBC:
+          dataConfirm = this->sendGBC(dataRequest, ch, bh, longPV);
+          break;
+        case TSB:
+          if(ch.GetHeaderSubType () == 0) dataConfirm = this->sendSHB(dataRequest, ch, bh, longPV);
+          break;
+        default:
+          std::cerr << "GeoNet: unsupported GNType in DCC callback." << std::endl;
+        }
+    });
   }
 
   GNDataConfirm_t
@@ -399,6 +475,8 @@ namespace ns3 {
         NS_LOG_ERROR("Cannot send SHB packet ");
         return UNSPECIFIED_ERROR;
       }
+    size_t pktSize = dataRequest.data->GetSize () + IEEE80211_DATA_PKT_HDR_LEN + IEEE80211_FCS_LEN + 8; // 8 = bytes layer LLC
+    m_dcc->updateTonpp(pktSize);
     //7)reset beacon timer to prevent dissemination of unnecessary beacon packet
     m_event_Beacon.Cancel ();
     double T_beacon = m_GnBeaconServiceRetransmitTimer + (rand()% m_GnBeaconServiceMaxJItter);

@@ -560,12 +560,12 @@ MetricSupervisor::checkCBR ()
             }
 
           double currentCbr = busyCbr.GetDouble () / (m_cbr_window * 1e6);
+          std::cout << Simulator::Now().GetSeconds() << "s - Node " << node_id << " - CBR: " << 100 * currentCbr << std::endl;
 
           if (m_average_cbr.find (item) != m_average_cbr.end ())
             {
               // Exponential moving average
-              double new_cbr =
-                  m_cbr_alpha * m_average_cbr[item].back () + (1 - m_cbr_alpha) * currentCbr;
+              double new_cbr = m_cbr_alpha * m_average_cbr[item].back () + (1 - m_cbr_alpha) * currentCbr;
               m_average_cbr[item].push_back (new_cbr);
             }
           else
@@ -717,7 +717,7 @@ MetricSupervisor::logLastCBRs ()
 }
 
 void
-MetricSupervisor::startCheckCBR ()
+MetricSupervisor::startCheckCBR (int num_nodes)
 {
   // Assert that the parameters for the CBR are set
   NS_ASSERT_MSG(m_cbr_window > 0, "CBR window must be greater than 0");
@@ -727,7 +727,8 @@ MetricSupervisor::startCheckCBR ()
 
   NS_ASSERT_MSG (m_node_container.GetN() != 0, "The Node container must be filled before the CBR checking.");
   uint8_t i = 0;
-  for(; i < m_node_container.GetN(); i++)
+  uint8_t nodes_to_check = num_nodes == -1 ? m_node_container.GetN() : num_nodes;
+  for(; i < nodes_to_check; i++)
     {
       Ptr<Node> node = m_node_container.Get (i);
       std::basic_ostringstream<char> oss;

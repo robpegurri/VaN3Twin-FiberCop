@@ -209,6 +209,9 @@ namespace ns3
     // synchronisation interval
     m_sumoCommand += " --step-length " + std::to_string(m_synchInterval.GetSeconds());
 
+    // warnings
+    m_sumoCommand += " --no-warnings";
+
     // sumo log file
     if (m_sumoLogFile)
       {

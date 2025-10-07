@@ -397,7 +397,7 @@ public:
   void modifyPRRComputationTimeout(double prr_comp_timeout_sec) {m_pprcomp_timeout=prr_comp_timeout_sec;}
 
 
-  void startCheckCBR();
+  void startCheckCBR(int num_nodes=-1);
   /**
    * @breif This function enables the writing of the CBR values to a file.
    */

@@ -476,7 +476,7 @@ namespace ns3 {
         return UNSPECIFIED_ERROR;
       }
     size_t pktSize = dataRequest.data->GetSize () + IEEE80211_DATA_PKT_HDR_LEN + IEEE80211_FCS_LEN + 8; // 8 = bytes layer LLC
-    m_dcc->updateTonpp(pktSize);
+    if (m_dcc != nullptr) m_dcc->updateTonpp(pktSize);
     //7)reset beacon timer to prevent dissemination of unnecessary beacon packet
     m_event_Beacon.Cancel ();
     double T_beacon = m_GnBeaconServiceRetransmitTimer + (rand()% m_GnBeaconServiceMaxJItter);

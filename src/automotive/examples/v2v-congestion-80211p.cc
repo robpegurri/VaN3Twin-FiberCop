@@ -125,6 +125,7 @@ int main (int argc, char *argv[])
   int txPower = 33.0; // IEEE 802.11p transmission power in dBm
   xmlDocPtr rou_xml_file;
   double simTime = 200.0; // Total simulation time (default: 100 seconds)
+  int dcc_nodes = 2;
 
   // Set here the path to the SUMO XML files
   std::string sumo_folder = "src/automotive/examples/sumo_files_v2v_map_congestion/";
@@ -221,7 +222,7 @@ int main (int argc, char *argv[])
   sumoClient->SetAttribute ("SumoLogFile", BooleanValue (false));
   sumoClient->SetAttribute ("SumoStepLog", BooleanValue (false));
   sumoClient->SetAttribute ("SumoSeed", IntegerValue (10));
-  sumoClient->SetAttribute ("SumoWaitForSocket", TimeValue (Seconds (1.0)));
+  sumoClient->SetAttribute ("SumoWaitForSocket", TimeValue (Seconds (1.5)));
 
   // Set up a Metricsupervisor
   // This module enables a trasparent and seamless collection of one-way latency (in ms) and PRR metrics
@@ -238,7 +239,7 @@ int main (int argc, char *argv[])
   metSup->setCBRAlphaValue(0.1);
   metSup->setSimulationTimeValue(simTime);
   metSup->setNodeContainer(c);
-  metSup->startCheckCBR();
+  metSup->startCheckCBR(dcc_nodes);
 
   // Create a new socket for the generation of broadcast interfering traffic
   // With the aim of sending generic broadcast packets, we use a PacketSocket
@@ -274,7 +275,7 @@ int main (int argc, char *argv[])
     }
 
   std::unordered_map<Ptr<Node>, Ptr<DCC>> dcc_per_node;
-  for (uint8_t i = 0; i < numberOfNodes; i++)
+  for (uint8_t i = 0; i < dcc_nodes; i++)
   {
     dcc_per_node[c.Get(i)] = CreateObject<DCC>();
   }
@@ -288,13 +289,13 @@ int main (int argc, char *argv[])
   // We setup here the ETSI stack for each vehicle (except the one generating interfering traffic), thanks to the BSContainer object
   STARTUP_FCN setupNewWifiNode = [&] (std::string vehicleID,TraciClient::StationTypeTraCI_t stationType) -> Ptr<Node>
     {
+      std::cout << "Setting up the ETSI ITS-G5 stack for vehicle " << vehicleID << std::endl;
       unsigned long nodeID = std::stol(vehicleID.substr (3))-1;
       uint32_t id = source_interfering[nodeID]->GetNode()->GetId();
-      /*
-      Simulator::ScheduleWithContext (id,
+      if (nodeID == 2)
+        Simulator::ScheduleWithContext (id,
                                       Seconds (1.0), &GenerateTraffic_interfering,
                                       source_interfering[nodeID], 1000, simTime*2000, MilliSeconds (5));
-                                      */
 
       // Create a new ETSI GeoNetworking socket, thanks to the GeoNet::createGNPacketSocket() function, accepting as argument a pointer to the current node
       Ptr<Socket> sock;
@@ -328,11 +329,15 @@ int main (int argc, char *argv[])
       basicServices.add(bs_container);
 
       // Setup DCC for both internal behavior and GeoNet link
-      dcc_per_node[c.Get(nodeID)]->SetupDCC(vehicleID, metSup, c.Get(nodeID), "reactive", 200);
-      dcc_per_node[c.Get(nodeID)]->setBitRate (6);
-      gn->setDCC (dcc_per_node[c.Get(nodeID)]);
-      gn->attachDCC();
-      dcc_per_node[c.Get(nodeID)]->StartDCC();
+      if (false && dcc_per_node.find(c.Get(nodeID))!=dcc_per_node.end())
+        {
+          std::cout << "DCC enabled for vehicle " << vehicleID << std::endl;
+          dcc_per_node[c.Get(nodeID)]->SetupDCC(vehicleID, metSup, c.Get(nodeID), "reactive", 200);
+          dcc_per_node[c.Get(nodeID)]->setBitRate (6);
+          gn->setDCC (dcc_per_node[c.Get(nodeID)]);
+          gn->attachDCC();
+          dcc_per_node[c.Get(nodeID)]->StartDCC();
+        }
 
       // Start transmitting CAMs
       // We randomize the instant in time in which the CAM dissemination is going to start

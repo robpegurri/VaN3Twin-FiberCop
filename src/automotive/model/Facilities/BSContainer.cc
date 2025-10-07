@@ -417,6 +417,10 @@ namespace ns3
 
     if (m_CPMs_enabled == true) {
       m_cpbs.terminateDissemination();
+      if (m_sumo_sensor != nullptr)
+        {
+          m_sumo_sensor->cleanup();
+        }
     }
 
     if(m_gn!=nullptr) {

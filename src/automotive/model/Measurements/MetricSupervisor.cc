@@ -560,7 +560,7 @@ MetricSupervisor::checkCBR ()
             }
 
           double currentCbr = busyCbr.GetDouble () / (m_cbr_window * 1e6);
-          std::cout << Simulator::Now().GetSeconds() << "s - Node " << node_id << " - CBR: " << 100 * currentCbr << std::endl;
+          if (false) std::cout << Simulator::Now().GetSeconds() << "s - Node " << node_id << " - CBR: " << 100 * currentCbr << std::endl;
 
           if (m_average_cbr.find (item) != m_average_cbr.end ())
             {

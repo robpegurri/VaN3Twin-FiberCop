@@ -238,7 +238,7 @@ def switch_to_carla():
     for pattern in comment_files:
         uncomment(FILE, pattern)
 
-
+    """
     sections_to_comment = [
         'v2x-emulator',
         'v2v-80211p-gps-tc-example',
@@ -246,6 +246,7 @@ def switch_to_carla():
         'v2v-simple-cam-exchange-80211p'
     ]
     comment_sections(FILE2, sections_to_comment)
+    """
 
     uncomment_section_examples(FILE2)
 
@@ -280,12 +281,14 @@ def switch_to_base():
     for pattern in uncomment_files:
         uncomment(FILE, pattern)
 
+    """
     sections_to_comment = [
         'v2x-emulator',
         'v2v-80211p-gps-tc-example',
         'v2v-80211p-gps-tc-dcc',
         'v2v-simple-cam-exchange-80211p'
     ]
+    """
 
     uncomment_sections(FILE2, sections_to_comment)
 

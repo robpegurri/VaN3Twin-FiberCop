@@ -108,7 +108,7 @@ Once the script finishes its execution the user should build the project again w
 
 **Possible issues with CARLA and OpenCDA installation**
 
-Here below there is a list of possible issues that can rise during the configuration and possible way to prevent/solve them:
+Below is a list of possible issues that can rise during the configuration and possible way to prevent/solve them:
 - In case OpenCDA was already present inside the VaN3Twin folder from previous runs of the script `switch_ms-van3t-CARLA.sh`, it is recommended to clean the cache of OpenCDA's folder before running again the installation script, with the command: `sudo rm -r OpenCDA/cache/`.
 - In case the anaconda virtual environment `msvan3t_carla` was already present in your system from previous runs of the script `switch_ms-van3t-CARLA.sh`, it is recommended to delete it before running again the installation script, with `conda remove -n msvan3t_carla --all` or `sudo rm -r ~/anaconda3/envs/environment_folder/`.
 - The anaconda environment solution steps (i.e., the prints `Solving environment:` in the installation phase) might take a while to complete, especially if it is not the first time you try to install the packages. It is normal to wait for some minutes.
@@ -134,6 +134,10 @@ This can be done locally or on a remote server using the following command:
 ```
 
 The supported and tested versions of `Sionna` are v0.19.0 and v1.0.
+
+To create Sionna environments, make sure to use Blender version 3.6.22 with the mitsuba-blender addon available [here](https://github.com/mitsuba-renderer/mitsuba-blender).
+
+The mitsuba-blender addon is used to export the scene in .xml format from Blender to Mitsuba.
 
 Once SIONNA is installed, you need first to configure the ray tracer simulation through `sionna_server_script.py` or `sionna_v1_server_script.py` scripts.
 The main difference between these two scripts is that the `sionna_server_script.py` simulates a simpler ray tracer simulation, without taking into account the vehicles speed and so the Doppler Effect.

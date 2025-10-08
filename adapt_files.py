@@ -242,6 +242,7 @@ def switch_to_carla():
     sections_to_comment = [
         'v2x-emulator',
         'v2v-80211p-gps-tc-example',
+        'v2v-80211p-gps-tc-dcc',
         'v2v-simple-cam-exchange-80211p'
     ]
     comment_sections(FILE2, sections_to_comment)
@@ -282,6 +283,7 @@ def switch_to_base():
     sections_to_comment = [
         'v2x-emulator',
         'v2v-80211p-gps-tc-example',
+        'v2v-80211p-gps-tc-dcc',
         'v2v-simple-cam-exchange-80211p'
     ]
 

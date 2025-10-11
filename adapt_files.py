@@ -226,6 +226,9 @@ def copytree_compat(src, dst):
 def switch_to_carla():
     ns_3_dir = os.getcwd()
 
+    subprocess.run(["mkdir", "src-backup"])
+    subprocess.run(["cp", "-r", "src/" "src-backup/"])
+
     # Switch CMakeLists.txt and PRRsup
     os.chdir('src/automotive/')
     copytree_compat('model/Measurements/', 'aux-files/Measurements-base/')
@@ -237,8 +240,7 @@ def switch_to_carla():
 
     for pattern in comment_files:
         uncomment(FILE, pattern)
-
-    """
+    
     sections_to_comment = [
         'v2x-emulator',
         'v2v-80211p-gps-tc-example',
@@ -246,7 +248,7 @@ def switch_to_carla():
         'v2v-simple-cam-exchange-80211p'
     ]
     comment_sections(FILE2, sections_to_comment)
-    """
+    
 
     uncomment_section_examples(FILE2)
 
@@ -270,6 +272,7 @@ def switch_to_carla():
 def switch_to_base():
     ns_3_dir = os.getcwd()
 
+    """
     # Switch CMakeLists.txt and PRRsup
     os.chdir('src/automotive/')
     copytree_compat('model/Measurements/', 'aux-files/Measurements-CARLA/')
@@ -281,14 +284,14 @@ def switch_to_base():
     for pattern in uncomment_files:
         uncomment(FILE, pattern)
 
-    """
+    
     sections_to_comment = [
         'v2x-emulator',
         'v2v-80211p-gps-tc-example',
         'v2v-80211p-gps-tc-dcc',
         'v2v-simple-cam-exchange-80211p'
     ]
-    """
+    
 
     uncomment_sections(FILE2, sections_to_comment)
 
@@ -297,6 +300,9 @@ def switch_to_base():
     # delete_header_if_present(FILE, header_content)
 
     remove_after_pattern(FILE, '${libcarla}')
+    """
+
+    subprocess.run(["cp", "-r", "src-backup/" "src/"])
 
     if os.path.exists("aux-files/current-mode.txt"):
         os.remove("aux-files/current-mode.txt")

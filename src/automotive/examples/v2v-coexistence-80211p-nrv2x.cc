@@ -94,6 +94,7 @@ static int packet_count = 0;
 static int counter = 0;
 BSMap basicServices; // Container for all ETSI Basic Services, installed on all vehicles
 bool phy_collection = true;
+bool use_sionna = false;
 
 void
 GetSlBitmapFromString (std::string slBitMapString, std::vector <std::bitset<1> > &slBitMapVector)
@@ -156,16 +157,23 @@ void receiveCAM(asn1cpp::Seq<CAM> cam, Address from, StationId_t my_stationID, S
   uint8_t los;
   Vector a_position = {pos.x, pos.y, pos.z};
   Vector b_position = {pos_sender.x, pos_sender.y, 0};
-  std::string los_str = getLOSStatusFromSionna(a_position, b_position);
-  if (los_str == "[False]")
-    {
-      los = 0;
-    }
+  if (use_sionna)
+  {
+    std::string los_str = getLOSStatusFromSionna(a_position, b_position);
+    if (los_str == "[False]")
+      {
+        los = 0;
+      }
+    else
+      {
+        los = 1;
+      }
+  }
   else
-    {
-      los = 1;
-    }
-
+  {
+    los = 0; // Default, with ns-3 models we should check if the model used provides LOS/NLOS state and its current value
+  }
+  
   std::ifstream camFileHeader("src/sinr_ni.csv");
   std::ofstream camFile;
   camFile.open("src/sinr_ni.csv", std::ios::out | std::ios::app);
@@ -228,15 +236,22 @@ void receiveCPM(asn1cpp::Seq<CollectivePerceptionMessage> cpm, Address from, Sta
   uint8_t los;
   Vector a_position = {pos.x, pos.y, pos.z};
   Vector b_position = {pos_sender.x, pos_sender.y, pos_sender.z};
-  std::string los_str = getLOSStatusFromSionna(a_position, b_position);
-  if (los_str == "[False]")
-    {
-      los = 0;
-    }
+  if (use_sionna)
+  {
+    std::string los_str = getLOSStatusFromSionna(a_position, b_position);
+    if (los_str == "[False]")
+      {
+        los = 0;
+      }
+    else
+      {
+        los = 1;
+      }
+  }
   else
-    {
-      los = 1;
-    }
+  {
+    los = 0; // Default, with ns-3 models we should check if the model used provides LOS/NLOS state and its current value
+  }
   std::ifstream cpmFileHeader("src/sinr_ni.csv");
   std::ofstream cpmFile;
   cpmFile.open("src/sinr_ni.csv", std::ios::out | std::ios::app);
@@ -271,11 +286,11 @@ void savePRRs(Ptr<MetricSupervisor> metSup, std::vector<std::string> nodes, std:
   std::ofstream file;
   if (type == "nr")
     {
-      file.open("src/sionna/prr_latency_ns3_coexistence_nrv2x.csv", std::ios::out | std::ios::app);
+      file.open("src/prr_latency_ns3_coexistence_nrv2x.csv", std::ios::out | std::ios::app);
     }
   else if (type == "11p")
     {
-      file.open("src/sionna/prr_latency_ns3_coexistence_11p.csv", std::ios::out | std::ios::app);
+      file.open("src/prr_latency_ns3_coexistence_11p.csv", std::ios::out | std::ios::app);
     }
   file << "node_id,prr,latency(ms)" << std::endl;
   for (int i = 0; i < nodes.size(); i++)
@@ -436,7 +451,8 @@ int main (int argc, char *argv[])
   cmd.Parse (argc, argv);
 
   std::cout << "Start running v2v-simple-cam-exchange-80211p-nrv2x simulation" << std::endl;
-
+  
+  use_sionna = sionna;
   SionnaHelper& sionnaHelper = SionnaHelper::GetInstance();
   if (sionna)
     {
@@ -1017,28 +1033,20 @@ int main (int argc, char *argv[])
   // When the simulation is terminated, gather the most relevant metrics from the PRRsupervisor
   std::cout << "Run terminated..." << std::endl;
 
-  std::ofstream outputFile("src/output.txt");
-  if (!outputFile.is_open())
-    {
-      std::cerr << "Unable to open file";
-    }
+  std::cout << "\nTotal number of packets received: " << packet_count << std::endl;
 
-  outputFile << "\nTotal number of packets received: " << packet_count << std::endl;
-
-  outputFile << "\nMetric Supervisor statistics for 802.11p" << std::endl;
-  outputFile << "Average PRR: " << metSup_11p->getAveragePRR_overall () << std::endl;
-  outputFile << "Average latency (ms): " << metSup_11p->getAverageLatency_overall () << std::endl;
-  outputFile << "Average SINR (dB): " << metSup_11p->getAverageSINR_overall() << std::endl;
-  outputFile << "RX packet count (from PRR Supervisor): " << metSup_11p->getNumberRx_overall () << std::endl;
-  outputFile << "TX packet count (from PRR Supervisor): " << metSup_11p->getNumberTx_overall () << std::endl;
+  std::cout << "\nMetric Supervisor statistics for 802.11p" << std::endl;
+  std::cout << "Average PRR: " << metSup_11p->getAveragePRR_overall () << std::endl;
+  std::cout << "Average latency (ms): " << metSup_11p->getAverageLatency_overall () << std::endl;
+  std::cout << "RX packet count (from PRR Supervisor): " << metSup_11p->getNumberRx_overall () << std::endl;
+  std::cout << "TX packet count (from PRR Supervisor): " << metSup_11p->getNumberTx_overall () << std::endl;
   // std::cout << "Average number of vehicle within the " << m_baseline_prr << " m baseline: " << metSup_11p->getAverageNumberOfVehiclesInBaseline_overall () << std::endl;
 
-  outputFile << "\nMetric Supervisor statistics for NR-V2X" << std::endl;
-  outputFile << "Average PRR: " << metSup_nr->getAveragePRR_overall () << std::endl;
-  outputFile << "Average latency (ms): " << metSup_nr->getAverageLatency_overall () << std::endl;
-  outputFile << "Average SINR (dB): " << metSup_nr->getAverageSINR_overall() << std::endl;
-  outputFile << "RX packet count (from PRR Supervisor): " << metSup_nr->getNumberRx_overall () << std::endl;
-  outputFile << "TX packet count (from PRR Supervisor): " << metSup_nr->getNumberTx_overall () << std::endl;
+  std::cout << "\nMetric Supervisor statistics for NR-V2X" << std::endl;
+  std::cout << "Average PRR: " << metSup_nr->getAveragePRR_overall () << std::endl;
+  std::cout << "Average latency (ms): " << metSup_nr->getAverageLatency_overall () << std::endl;
+  std::cout << "RX packet count (from PRR Supervisor): " << metSup_nr->getNumberRx_overall () << std::endl;
+  std::cout << "TX packet count (from PRR Supervisor): " << metSup_nr->getNumberTx_overall () << std::endl;
   // std::cout << "Average number of vehicle within the " << m_baseline_prr << " m baseline: " << metSup_nr->getAverageNumberOfVehiclesInBaseline_overall () << std::endl;
 
   Simulator::Destroy ();
@@ -1048,7 +1056,7 @@ int main (int argc, char *argv[])
 
   auto end_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = end_time - start_time;
-  outputFile << "\nSimulation time: " << elapsed.count() << " seconds" << std::endl;
+  std::cout << "\nSimulation time: " << elapsed.count() << " seconds" << std::endl;
 
   return 0;
 }

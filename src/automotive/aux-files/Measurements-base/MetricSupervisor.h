@@ -125,7 +125,7 @@ public:
   /**
    * @brief Get the average SINR for all the messages received in the simulation.
    * @return  The average SINR [dB]
-   */
+
   double getAverageSINR_overall(void) {
     double sum = 0.0;
     for (auto item : m_sinr_per_veh)
@@ -134,7 +134,7 @@ public:
       }
     return sum / m_sinr_per_veh.size();
   }
-
+  */
   /**
    * @brief Get the total number of packets transmitted in the whole simulation.
    * @return  The total number of packets transmitted.
@@ -255,7 +255,7 @@ public:
    * @brief Get the average SINR for all the messages sent and received by a specific vehicle.
    * @param vehicleID  The ID of the vehicle.
    * @return  The average SINR [dB]
-   */
+
   double getAverageSINR_vehicle(uint64_t vehicleID) {
     double sum = 0.0;
     for (auto sinr : m_sinr_per_veh[vehicleID])
@@ -264,6 +264,7 @@ public:
       }
     return sum / m_sinr_per_veh[vehicleID].size();
   }
+   */
   double getAverageLatency_vehicle(uint64_t vehicleID) {return m_avg_latency_ms_per_veh[vehicleID];}
   /**
    * @brief Get the total number of packets transmitted by a specific vehicle.

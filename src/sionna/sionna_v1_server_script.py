@@ -7,7 +7,7 @@ from sionna.rt import load_scene, PlanarArray, Transmitter, Receiver, PathSolver
 from scipy.spatial import cKDTree
 import subprocess, signal
 import argparse
-
+import mitsuba as mi
 
 def manage_location_message(message, sionna_structure):
     t = time.time()
@@ -74,13 +74,17 @@ def manage_location_message(message, sionna_structure):
 
             # Apply change to the scene
             if sionna_structure["scene"].get(f"car_{car}"):
+                print(f"Getting car_{car}...")
                 from_sionna = sionna_structure["scene"].get(f"car_{car}")
-            
+                print("Done!")
                 new_orientation = ((360 - new_angle) % 360 + 90)*np.pi/180
-
-                from_sionna.position = [new_x, new_y, new_z]
-                from_sionna.orientation = [new_orientation, 0, 0]
-                from_sionna.velocity = [new_v_x, new_v_y, new_v_z]
+                print("Setting position...")
+                pos = [new_x, new_y, new_z]
+                from_sionna.position = mi.Point3f(pos[0], pos[1], pos[2])
+                print("Setting orientation...")
+                from_sionna.orientation = mi.Point3f(new_orientation, 0, 0)
+                print("Done!")
+                #from_sionna.velocity = [new_v_x, new_v_y, new_v_z]
                 
                 if sionna_structure["verbose"]: 
                     print(f"Updated car_{car} position in the scene.")
@@ -483,7 +487,7 @@ def main():
     # Other
     parser.add_argument('--verbose', action='store_true', help='[DEBUG] Flag for verbose output')
     parser.add_argument('--time-checker', action='store_true', help='[DEBUG] Flag to check time taken for each operation')
-    parser.add_argument('--gpu', type=int, help='Number of GPUs, set 0 to use CPU only (refer to TensorFlow and Sionna documentation)', default=2)
+    parser.add_argument('--gpu', type=int, help='Number of GPUs, set 0 to use CPU only (refer to TensorFlow and Sionna documentation)', default=0)
     parser.add_argument('--dynamic-objects-name', type=str, help='Name of the dynamic objects; in the Scenario they must be called e.g., car_id, with id=SUMO ID (only number)', default="car")
 
     args = parser.parse_args()
@@ -521,7 +525,7 @@ def main():
     sionna_structure["time_checker"] = time_checker
 
     # Load scene and configure radio settings
-    sionna_structure["scene"] = load_scene(filename=file_name, merge_shapes_exclude_regex=dynamic_objects_name)
+    sionna_structure["scene"] = load_scene(filename=file_name, merge_shapes_exclude_regex="car")
     sionna_structure["scene"].frequency = frequency
     sionna_structure["scene"].bandwidth = bandwidth
     
